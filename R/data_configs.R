@@ -1,0 +1,48 @@
+source(here::here("R","util.R"))
+source(here::here("R","SIRTDsim.R"))
+
+# Each run is a row in runDf, the rows contain all information necessary to run
+# an experiment. The data in the columns can vary based on whether a sim is being
+# run, real data etc. 
+# Brazil data
+# Simulated data
+# 
+# section 1
+#Globals
+
+
+
+#' 
+#' 
+#' @return dataframe for use in runEval.R
+data_brazil_1 <- function (source_df) {
+  brazil_df <- readRDS(here::here("data","brazil_nation_2020.rds"))
+  brazil_df <- brazil_df[-(1:20),] #start with first death
+  brazil_pop <- 214110287
+  tweets = read.csv(here::here("data","tweet_count.csv"))
+  colnames(tweets) = c('date_t','predicted_tweets')
+  
+  tweets_padded = rbind(data.frame(date_t = rep(NA,86), 
+                                  predicted_tweets = rep(0,86)), 
+                       tweets)
+  brazil_df = cbind(brazil_df,tweets_padded[1:291,])
+
+  run_df <- copy(source_df)
+  run_df$n_pop <- brazil_pop
+  run_df$n_days = nrow(brazil_df)
+  run_df$n_patient_zero <- brazil_df[1,]$new_confirmed
+  run_df$description <- "Brazil 3-16-2020 - 12-31-2020"
+  run_df$sim_run_id <- 0
+  run_df$d <- list(brazil_df$last_available_deaths)
+  run_df$tweets <- list(brazil_df$predicted_tweets)
+  run_df$reports <- list(c('graph_data'))
+  
+  
+
+  
+  
+  return(run_df)
+}
+#214,110,287
+#run_df <- setup_run_df(seed = 123, n_pop = 214110287, n_days = 365)
+#sim_brazil_1(run_df)
