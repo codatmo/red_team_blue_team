@@ -17,4 +17,5 @@ The Blue Team models the simulated COVID outbreak and assess performance by vari
 
 # Software
 
-In addition to the above SIRTD DGP above we have a simple script for running various configurations of simulations/real data/models in the same evaluation harness with some options to view graphs, view metrics and so on. 
+In addition to the above SIRTD DGP above we have a simple script for running various configurations of simulations/real data/models in the same evaluation harness with some options to view graphs, view metrics and so on. The docmentation is at [https://codatmo.github.io/red_team_blue_team/run_eval_doc.html](https://codatmo.github.io/red_team_blue_team/run_eval_doc.html). 
+
