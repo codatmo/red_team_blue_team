@@ -11,7 +11,8 @@ test_that("Mirror Website test", {
             death_prob = .01,
             tweet_rate = .2,
             n_patient_zero = 10,
-            days_to_death = 10)
+            days_to_death = 10,
+            round = FALSE)
     expect_equal(df[291,]$s, 194184448.76, tolerance  = 0.01)
     expect_equal(df[291,]$i, 4215919.68, tolerance  = 0.01)
     expect_equal(df[291,]$r, 15552819.37, tolerance  = 0.01)
@@ -20,6 +21,27 @@ test_that("Mirror Website test", {
     expect_equal(df[291,]$tweets, 818554.51, tolerance  = 0.01)
 
 })
+
+test_that("Mirror Website test integer", {
+  df <- sirtd_exact(n_pop = 214110287,
+                    n_days = 291,
+                    print = FALSE,
+                    beta_daily_inf_rate = .19,
+                    num_inf_days = 7,
+                    death_prob = .01,
+                    tweet_rate = .2,
+                    n_patient_zero = 10,
+                    days_to_death = 10,
+                    round = TRUE)
+  expect_equal(df[291,]$s, 194184448.76, tolerance  = 0.01)
+  expect_equal(df[291,]$i, 4215919.68, tolerance  = 0.01)
+  expect_equal(df[291,]$r, 15552819.37, tolerance  = 0.01)
+  expect_equal(df[291,]$t, 45126.54, tolerance  = 0.01)
+  expect_equal(df[291,]$d, 111972.64, tolerance  = 0.01)
+  expect_equal(df[291,]$tweets, 818554.51, tolerance  = 0.01)
+  
+})
+
 
 
 
