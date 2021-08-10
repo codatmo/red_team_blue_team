@@ -2,6 +2,27 @@ library(testthat)
 
 source(here::here('R','SIRTDsim.R'))
 
+test_that("Mirror Website test", {
+  df <- sirtd_exact(n_pop = 214110287,
+            n_days = 291,
+            print = FALSE,
+            beta_daily_inf_rate = .19,
+            num_inf_days = 7,
+            death_prob = .01,
+            tweet_rate = .2,
+            n_patient_zero = 10,
+            days_to_death = 10)
+    expect_equal(df[291,]$s, 194184448.76, tolerance  = 0.01)
+    expect_equal(df[291,]$i, 4215919.68, tolerance  = 0.01)
+    expect_equal(df[291,]$r, 15552819.37, tolerance  = 0.01)
+    expect_equal(df[291,]$t, 45126.54, tolerance  = 0.01)
+    expect_equal(df[291,]$d, 111972.64, tolerance  = 0.01)
+    expect_equal(df[291,]$tweets, 818554.51, tolerance  = 0.01)
+
+})
+
+
+
 test_that("Tweet test", {
   nPop <- 210147125
   nDays <- 311
@@ -43,7 +64,7 @@ test_that("Tweet test", {
   runDf = simRunDf
   i = 1
   reduction = 10000
-  simDf = sirtd_vary_beta(seed = runDf[i,]$seed,
+  simDf = sirtd_vary_beta_exact(seed = runDf[i,]$seed,
                         n_pop = round(runDf[i,]$nPop/reduction), 
                         n_days = runDf[i,]$nDays, 
                         print = FALSE,
@@ -54,7 +75,7 @@ test_that("Tweet test", {
                         mean_days_to_death_from_t = runDf[i,]$daysToDeath,
                         n_patient_zero = runDf[i,]$nPatientZero,
                         death_prob = runDf[i,]$deathRate)
-  expect_equal(sum(simDf$tweets), 928)
+  expect_equal(sum(simDf$tweets), 5216)
 })
 
 test_that("NA test", {
@@ -73,7 +94,7 @@ test_that("NA test", {
   betaForWeek = abs(rnorm(nWeeks, betaInfectionRateMeanSim, sdOfBetas))
   betaDailyInfectionRatesSim = rep(betaForWeek, times = rep(7,nWeeks))
   
-  simDf = sirtd_vary_beta(seed = seed,
+  simDf = sirtd_vary_beta_exact(seed = seed,
                         n_pop = nPop,
                         n_days = nDays,
                         print = FALSE,
@@ -106,7 +127,7 @@ test_that("SIRTD test1",{
   nDailyContacts = 10
   
   
-  simDf = sirtd_vary_beta(seed = seed,
+  simDf = sirtd_vary_beta_exact(seed = seed,
                         n_pop = nPop,
                         n_days = nDays,
                         print = FALSE,
@@ -120,8 +141,8 @@ test_that("SIRTD test1",{
   
   
   expect_equal(nrow(simDf), 70)
-  expect_equal(simDf[50,]$tweets, 857)
-  expect_equal(simDf[50,]$d, 299)
+  expect_equal(simDf[50,]$tweets, 1197)
+  expect_equal(simDf[50,]$d, 761)
 })
 
 

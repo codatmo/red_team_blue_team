@@ -309,5 +309,73 @@ sirtd_vary_beta_exact <- function(seed,
   }
   return(df)
 }
+
 # sirtd_vary_beta_exact
+#' Runs same algorithm as the DGP website https://blooming-lake-98194.herokuapp.com/. 
+#' @param n_pop Population size
+#' @param n_days Number of days to run simulation
+#' @param print Boolean to control whether daily summary is printed
+#' @param beta_daily_inf_rate Controls number of s that are infected by i to 
+#' become i. Should be between 0 and 1
+#' @param num_days_infectuous Controls number of i that transition to r or t
+#' @param death_prob Probability transitioning from i to t
+#' @param tweet_rate_infected If infected, what rate of tweets per day. Can be 
+#' > 1
+#' @param n_patient_zero Number of patients infected at day 0
+#' @param mean_days_to_death_from_t Mean number of days in t before d
+#' @return dataframe simulating sirtd+tweets state for number days 
+
+sirtd_exact <- function(n_pop,
+                        n_days,
+                        print,
+                        beta_daily_inf_rate,
+                        num_inf_days,
+                        death_prob,
+                        tweet_rate,
+                        n_patient_zero,
+                        days_to_death) {
+  i <- n_patient_zero
+  r <- 0
+  t <- 0
+  d <- 0
+  s <- n_pop - n_patient_zero 
+  col_names = c('day', 's', 'i', 'r', 't', 'd', 'tweets')
+  df = data.frame(matrix(nrow = 0, ncol=length(col_names)))
+  colnames(df) = col_names
+  tweets = 0
+  for (day in 1:n_days) {
+    df[day,] = rep(NA,length(col_names)) 
+    df[day,]$s=  s
+    df[day,]$i = i
+    df[day,]$r = r
+    df[day,]$t = t
+    df[day,]$d = d
+    df[day,]$day = day
+    df[day,]$tweets = tweets
+    if (print) {
+      cat(
+        sprintf(
+          "\nDay=%d, susceptible=%.2f, infected=%.2f, recovered=%.2f, terminal=%.2f,
+           dead=%.2f, tweets=%.2f, R0=%.2f %.2f",
+          df[day,]$day, df[day,]$s, df[day,]$i, df[day,]$r, df[day,]$t,
+          df[day,]$d, df[day,]$tweets,
+          beta_daily_inf_rate/(1/num_inf_days),
+          s + i + r + t + d))
+    }
+    
+    s_delta <- -beta_daily_inf_rate * s * (i / n_pop)
+    i_delta <- beta_daily_inf_rate * s * (i / n_pop) - ((1 / num_inf_days) * i)
+    r_delta <- (1 / num_inf_days) * i * (1 - death_prob)
+    t_delta <- (1 / num_inf_days) * i * death_prob - (1 / days_to_death) * t
+    d_delta <- (1 / days_to_death) * t
+    tweets <- i * tweet_rate
+    s <- s + s_delta
+    i <- i + i_delta
+    r <- r + r_delta
+    t <- t + t_delta
+    d <- d + d_delta
+  }
+  return(df)
+}
+
 
