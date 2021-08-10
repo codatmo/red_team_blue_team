@@ -26,6 +26,7 @@ model_stan_baseline <- function(run_df) {
 model_stan_UNINOVE_Brazil <- function(run_df) {
   
   model_df <- copy(run_df)
+  model_df$compute_likelihood <- 1
   model_df$apply_twitter_data <- 1
   model_df$model_to_run <- 'UNINOVE_Brazil'
   model_df$description <- paste0(model_df$description,

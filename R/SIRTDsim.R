@@ -333,7 +333,8 @@ sirtd_exact <- function(n_pop,
                         death_prob,
                         tweet_rate,
                         n_patient_zero,
-                        days_to_death) {
+                        days_to_death,
+                        round=TRUE) {
   i <- n_patient_zero
   r <- 0
   t <- 0
@@ -374,6 +375,15 @@ sirtd_exact <- function(n_pop,
     r <- r + r_delta
     t <- t + t_delta
     d <- d + d_delta
+    if (round) {
+      s <- round(s)
+      i <- round(i)
+      r <- round(r)
+      t <- round(t)
+      d <- round(d)
+      s <- s + n_pop - (s + i + r + t + d) #adjust to sum to pop in s
+      tweets <- round(tweets)
+    }
   }
   return(df)
 }
