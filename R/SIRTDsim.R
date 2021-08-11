@@ -334,7 +334,7 @@ sirtd_exact <- function(n_pop,
                         tweet_rate,
                         n_patient_zero,
                         days_to_death,
-                        round=TRUE) {
+                        round = TRUE) {
   i <- n_patient_zero
   r <- 0
   t <- 0
@@ -346,13 +346,16 @@ sirtd_exact <- function(n_pop,
   tweets = 0
   for (day in 1:n_days) {
     df[day,] = rep(NA,length(col_names)) 
-    df[day,]$s=  s
-    df[day,]$i = i
-    df[day,]$r = r
-    df[day,]$t = t
-    df[day,]$d = d
+    df[day,]$s = ifelse(round, round(s), s)
+    df[day,]$i = ifelse(round, round(i), i)
+    df[day,]$r = ifelse(round, round(r), r)
+    df[day,]$t = ifelse(round, round(t), t)
+    df[day,]$d = ifelse(round, round(d), d)
+    if (round){
+      df[day,]$s = df[day,]$s + (n_pop - sum(df[day,c('s', 'i', 'r', 't', 'd')]))
+    }
     df[day,]$day = day
-    df[day,]$tweets = tweets
+    df[day,]$tweets = ifelse(round, round(tweets), tweets)
     if (print) {
       cat(
         sprintf(
@@ -375,15 +378,7 @@ sirtd_exact <- function(n_pop,
     r <- r + r_delta
     t <- t + t_delta
     d <- d + d_delta
-    if (round) {
-      s <- round(s)
-      i <- round(i)
-      r <- round(r)
-      t <- round(t)
-      d <- round(d)
-      s <- s + n_pop - (s + i + r + t + d) #adjust to sum to pop in s
-      tweets <- round(tweets)
-    }
+  
   }
   return(df)
 }

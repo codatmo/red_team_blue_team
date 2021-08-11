@@ -104,6 +104,46 @@ sim_brazil_1 <- function (source_df) {
   run_df$reports <- list(c('graph_sim', 'plot'))
   return(run_df)
 }
+
+
+#' Mirrors Brazil's observerd deaths/tweets with params from 
+#' the DGP website https://blooming-lake-98194.herokuapp.com/.
+#' no model configuration/reporting configured
+#' @return dataframe for use in run_eval.R
+sim_brazil_web <- function (source_df) {
+  run_df <- copy(source_df)
+  run_df$n_pop <- 214110287
+  run_df$n_days <- 291
+  run_df$beta_mean <- .19
+  run_df$beta_daily_rate <- list(rep(run_df$beta_mean, 
+                                          run_df$n_days))
+  number_of_infectious_days <- 7
+  run_df$gamma <- 1/7
+  run_df$death_prob <- .01
+  run_df$tweet_rate <- .2
+  run_df$days2death <- 10
+  run_df$n_patient_zero <- 10
+  run_df$description <- "Brazil web app"
+  run_df$sim_run_id <- 1
+  sim_df <- sirtd_exact(n_pop = run_df$n_pop,
+            n_days = run_df$n_days,
+            print = FALSE,
+            beta_daily_inf_rate = run_df$beta_mean,
+            num_inf_days = number_of_infectious_days,
+            death_prob = .01,
+            tweet_rate = run_df$tweet_rate,
+            n_patient_zero = run_df$n_patient_zero,
+            days_to_death = run_df$days2death)
+  run_df$s <- list(sim_df$s)
+  run_df$i <- list(sim_df$i)
+  run_df$r <- list(sim_df$r)
+  run_df$t <- list(sim_df$t)
+  run_df$d <- list(sim_df$d)
+  run_df$tweets <- list(sim_df$tweets)
+  return(run_df)
+}
+
+
 #214,110,287
 #run_df <- setup_run_df(seed = 123, n_pop = 214110287, n_days = 365)
 #sim_brazil_1(run_df)
