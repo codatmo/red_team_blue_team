@@ -117,7 +117,8 @@ while (j < nrow(run_df)) {
                              fit = fit,
                              show_ribbon = TRUE)
   }
-  plot = plot + theme(legend.position = "none")
+  max_y = max(unlist(run_df[j,]$i), unlist(run_df[j,]$pred_tweets))
+  plot = plot + xlim(0,400) +ylim(0,max_y) + theme(legend.position = "none")
   if (length(unlist(run_df[j,]$reports)) > 0) {
     print(plot)
   }

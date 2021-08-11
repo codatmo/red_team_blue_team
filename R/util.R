@@ -40,7 +40,7 @@ countPredictionsInQuantile <- function(fit, run_df, j, print = FALSE) {
   
     predTweetsDf = fit$summary(variables = c('pred_tweets'), mean,
                              ~quantile(.x, probs = c(minQuantile, maxQuantile),
-                                       na.rm = TRUE))  #set to FALSE when Jose fixes his model
+                                       na.rm = FALSE))  #set to FALSE when Jose fixes his model
     predTweetsDf$day = 1:nrow(predTweetsDf)
   
     deaths_in_interval = countPredInInterval(truth = unlist(run_df[j,]$d),
@@ -161,13 +161,20 @@ plot_predictions <- function(plot, prediction_label, fit, show_ribbon = TRUE) {
                                       na.rm = FALSE))  #set to FALSE when Jose fixes his model
     pred_df$day = 1:nrow(pred_df)
     pred_df$count = pred_df$mean
+    pred_df$label = prediction_label
+    
+
     plot = plot + geom_line(data = pred_df)
     if (show_ribbon) {
       plot <- plot + geom_ribbon(data = pred_df, aes(ymin = .data[[minQuantileLabel]],
                                               ymax = .data[[maxQuantileLabel]],
                                               fill = "blue"),
                           alpha = 0.3, fill = "blue")
+            
     }
+    plot <- plot + geom_label_repel(data = subset(pred_df, day == nrow(pred_df)), 
+                              aes(label = label),
+                              xlim = 300)
     return(plot)
 }
 
