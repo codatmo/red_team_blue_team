@@ -83,7 +83,7 @@ model {
   if (compute_likelihood == 1){
     for (i in 1:n_days) {
       if (use_twitter == 1) {
-        symptomaticTweets[i] ~ neg_binomial_2(twitter_rate * daily_counts_ODE[i, 2],
+        symptomaticTweets[i] ~ neg_binomial_2(twitter_rate * daily_counts_ODE[i, 2] + 1E-4,
                                               phi_twitter);
       }
       death_count[i] ~ neg_binomial_2(daily_counts_ODE[i, 5] + 1E-4, phi);
@@ -121,8 +121,8 @@ generated quantities {
           pred_deaths[i] = neg_binomial_2_rng(state_D[i] + 1E-4, phi);
       }
       if (use_twitter == 1) {
-          pred_tweets[i] = neg_binomial_2_rng(twitter_rate *
-                                   state_I[i] + 1E-4, phi_twitter);
+          pred_tweets[i] = neg_binomial_2_rng(twitter_rate * state_I[i] + 1E-4,
+                                              phi_twitter);
       }
       else {
         pred_tweets[i] = 0;
