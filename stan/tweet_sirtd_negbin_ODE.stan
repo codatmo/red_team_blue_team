@@ -57,7 +57,7 @@ parameters {
 
   real<lower=0.001> phi_inv;
   real<lower=0.001> phi_twitter_inv;
-  real<lower=0> twitter_rate;
+  real<lower=0.001> twitter_rate;
 }
 transformed parameters{
   real phi = 1.0 / phi_inv;
@@ -86,7 +86,7 @@ model {
         symptomaticTweets[i] ~ neg_binomial_2(twitter_rate * daily_counts_ODE[i, 2],
                                               phi_twitter);
       }
-      death_count[i] ~ neg_binomial_2(daily_counts_ODE[i, 5], phi);
+      death_count[i] ~ neg_binomial_2(daily_counts_ODE[i, 5] + 1E-4, phi);
     }
   }
 }
@@ -118,18 +118,18 @@ generated quantities {
   real gamma = dI; // returning dI as gamma for breck's
   for (i in 1:n_days) {
      if (compute_likelihood == 1) {
-          pred_deaths[i] = neg_binomial_2_rng(state_D[i], phi);
+          pred_deaths[i] = neg_binomial_2_rng(state_D[i] + 1E-4, phi);
       }
       if (use_twitter == 1) {
           pred_tweets[i] = neg_binomial_2_rng(twitter_rate *
-                                   state_I[i], phi_twitter);
+                                   state_I[i] + 1E-4, phi_twitter);
       }
       else {
         pred_tweets[i] = 0;
       }
       if (is_nan(pred_deaths[i])) {
         pred_deaths[i] = -1;
-      } 
+      }
       if (is_nan(pred_tweets[i])) {
         pred_tweets[i] = -1;
       }
