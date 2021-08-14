@@ -5,6 +5,7 @@ library(tidyverse)
 library(cmdstanr)
 library(data.table)
 library(kableExtra)
+library(shinystan)
 
 source(here::here("R","util.R"))
 source(here::here("R","SIRTDsim.R"))
@@ -21,17 +22,23 @@ run_data_df <- data_brazil_1(setup_run_df)
 #run_data_df <- data_web_app(setup_run_df, "data/web_app_1.csv")
 #run_data_df <- sim_brazil_web(setup_run_df)
 
-#run_df <- model_stan_baseline(run_data_df) #in R/modeling_configs.R
-#run_df$ode_solver <- 'rk45'
-run_df <- model_stan_UNINOVE_Brazil(run_data_df)
+run_df <- model_stan_baseline(run_data_df) #in R/modeling_configs.R
+run_df$ode_solver <- 'block'
+#run_df <- model_stan_UNINOVE_Brazil(run_data_df)
 run_df$use_tweets <- 1
-run_df$reports <- list(c('graph_data','graph_tweets', 'graph_d'))
+
+run_df$reports <- list(c('graph_data','graph_tweets', 
+                         'graph_d', 'graph_ODE'))
+
+
+#run_df$reports <- list(c('graph_data','plot_pred_tweets_draws', 
+#                         'plot_pred_death_draws'))
 #run_df$compute_likelihood <- 1 # compute likelihood across all runs
 #run_df$reports <- list(c('graph_sim', 'graph_tweets', 'graph_d', 'plot'))
    #list(c('graph_sim','graph_ODE', 'graph_tweets', 'graph_d', 'plot','param_recovery'))
 # setup run_df
 # run models
-run_df$compute_likelihood <- 0
+run_df$compute_likelihood <- 1
 j <- 0
 while (j < nrow(run_df)) {
   j <- j + 1
@@ -51,7 +58,18 @@ while (j < nrow(run_df)) {
            run_block_ODE = ifelse(run_df[j,]$ode_solver == 'block', 1, 0),
            run_rk45_ODE = ifelse(run_df[j,]$ode_solver == 'rk45', 1, 0),
            scale = 1,
-           center = 1)
+           center = 0,
+           prior_beta_mean = .2,
+           prior_beta_std = .2,
+           prior_gamma_mean = .2,
+           prior_gamma_std = .2,
+           prior_death_prob = .01,
+           prior_death_prob_std = .005,
+           prior_twitter_lambda = 1.0,
+           prior_twitter_std = 1.0,
+           days_held_out = 0,
+           I2DandR = 0,
+           I2D2R = 1)
     model <- cmdstan_model(here::here("stan", "baseline.stan"))
 
     fit <- model$sample(data=stan_data,
@@ -80,7 +98,8 @@ while (j < nrow(run_df)) {
                         prior_dI_std = 10,
                         prior_dT_mean = 0,
                         prior_dT_std = 10,
-                        prior_twitter_lambda = 1
+                        prior_twitter_lambda = 1,
+                        days_held_out = 0
                         )
     model2 <- cmdstan_model(here::here("stan", "tweet_sirtd_negbin_ODE.stan"))
     fit <- model2$sample(data=stan_data_2,
@@ -111,8 +130,16 @@ while (j < nrow(run_df)) {
 
   }
   if ('graph_ODE' %in% unlist(run_df[j,]$reports)) {
-    plot <- graph_ODE(data_df = run_df[j,], fit = fit, hide_s = FALSE,
+    plot <- graph_ODE(data_df = run_df[j,], fit = fit, hide_s = TRUE,
                              plot = plot)
+  }
+  if ('plot_pred_death_draws' %in% unlist(run_df[j,]$reports)) {
+    plot <- plot_draws(plot = plot, variable = 'pred_deaths', 
+                       n_columns = run_df[j,]$n_days, color = 'blue', fit = fit)
+  }
+  if ('plot_pred_tweets_draws' %in% unlist(run_df[j,]$reports)) {
+    plot <- plot_draws(plot = plot, variable = 'pred_tweets', 
+                       n_columns = run_df[j,]$n_days, color = 'red', fit = fit)
   }
   if ('graph_tweets' %in% unlist(run_df[j,]$reports)) {
     plot <- plot_predictions(plot = plot, prediction_label = 'pred_tweets',
@@ -124,7 +151,7 @@ while (j < nrow(run_df)) {
                              fit = fit,
                              show_ribbon = TRUE)
   }
-  max_y = max(unlist(run_df[j,]$pred_tweets))
+#  max_y = max(unlist(run_df[j,]$pred_tweets))
   plot = plot + xlim(0,400) + theme(legend.position = "none")
   if (length(unlist(run_df[j,]$reports)) > 0) {
     print(plot)
