@@ -35,12 +35,12 @@ countPredictionsInQuantile <- function(fit, run_df, j, print = FALSE) {
   
     predCasesDf = fit$summary(variables = c('pred_deaths'), mean,
                             ~quantile(.x, probs = c(minQuantile, maxQuantile),
-                                      na.rm = FALSE))  #set to FALSE when Jose fixes his model
+                                      na.rm = TRUE))  #set to FALSE when Jose fixes his model
     predCasesDf$day = 1:nrow(predCasesDf)
   
     predTweetsDf = fit$summary(variables = c('pred_tweets'), mean,
                              ~quantile(.x, probs = c(minQuantile, maxQuantile),
-                                       na.rm = FALSE))  #set to FALSE when Jose fixes his model
+                                       na.rm = TRUE))  #set to FALSE when Jose fixes his model
     predTweetsDf$day = 1:nrow(predTweetsDf)
   
     deaths_in_interval = countPredInInterval(truth = unlist(run_df[j,]$d),
@@ -113,7 +113,7 @@ graph_real_data <- function(data_df, plot) {
                                             color = source),
                   size = .5) + 
          geom_label_repel(data = subset(real_data_df, 
-                                        day == round(data_df$n_days/2)), 
+                                        day == round(data_df$n_days)), 
                             aes(label = source,
                                 color = source)))
 }
@@ -158,7 +158,7 @@ plot_predictions <- function(plot, prediction_label, fit, show_ribbon = TRUE) {
     maxQuantileLabel = '80%'
     pred_df = fit$summary(variables = c(prediction_label), mean,
                             ~quantile(.x, probs = c(minQuantile, maxQuantile),
-                                      na.rm = FALSE))  #set to FALSE when Jose fixes his model
+                                      na.rm = TRUE))  #set to FALSE when Jose fixes his model
     pred_df$day = 1:nrow(pred_df)
     pred_df$count = pred_df$mean
     pred_df$label = prediction_label
@@ -177,6 +177,27 @@ plot_predictions <- function(plot, prediction_label, fit, show_ribbon = TRUE) {
                               xlim = 300)
     return(plot)
 }
+
+plot_draws <- function(plot, variable, n_columns, color, fit) {
+
+  drawsDf <- fit$draws(variables = c(variable), format = 'draws_df')
+  sample_size = 40
+  sampleDrawsDf <- drawsDf[sample(nrow(drawsDf), sample_size, replace = FALSE),]
+  colnames(sampleDrawsDf)[1:n_columns] <- 1:n_columns
+  longSampleDrawsDf <- gather(sampleDrawsDf, key=day, value=variable,
+                            1:all_of(n_columns))
+
+  longSampleDrawsDf$day <- as.numeric(longSampleDrawsDf$day)
+  longSampleDrawsDf$count <- as.numeric(longSampleDrawsDf$variable)
+  return( plot +
+          geom_line(data = longSampleDrawsDf, alpha = 0.2, color = color, 
+          aes(group = .draw)))
+}
+
+
+
+
+
 
 #' Returns string with calulation of parameter recovery
 #' @param data_df row of run_df
