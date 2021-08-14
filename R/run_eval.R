@@ -67,13 +67,13 @@ while (j < nrow(run_df)) {
                         death_count = unlist(run_df[j,]$d),
                         symptomaticTweets = unlist(run_df[j,]$tweets),
                         prior_beta_mean = 0,
-                        prior_beta_std = 10,
+                        prior_beta_std = 1,
                         prior_omega_mean = 0,
-                        prior_omega_std = 10,
+                        prior_omega_std = 1,
                         prior_dI_mean = 0,
-                        prior_dI_std = 10,
+                        prior_dI_std = 1,
                         prior_dT_mean = 0,
-                        prior_dT_std = 10,
+                        prior_dT_std = 1,
                         prior_twitter_lambda = 1
                         )
     model2 <- cmdstan_model(here::here("stan", "tweet_sirtd_negbin_ODE.stan"))
