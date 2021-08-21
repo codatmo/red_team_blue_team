@@ -54,10 +54,6 @@ data_brazil_1 <- function (source_df) {
   return(run_df)
 }
 
-
-
-
-
 # 214,110,287
 # run_df <- setup_run_df(seed = 123, n_pop = 214110287, n_days = 365)
 # run_df <- data_web_app(run_df, file_name = "data/web_app_1.csv")
