@@ -1,5 +1,6 @@
 source(here::here("R","util.R"))
 source(here::here("R","SIRTDsim.R"))
+source(here::here("R","SIRDsim.R"))
 
 # Each run is a row in runDf, the rows contain all information necessary to run
 # an experiment. The data in the columns can vary based on whether a sim is being
@@ -127,7 +128,7 @@ sim_brazil_web <- function (source_df) {
   run_df$sim_run_id <- 1
   sim_df <- sirtd_exact(n_pop = run_df$n_pop,
             n_days = run_df$n_days,
-            print = FALSE,
+            print = False,
             beta_daily_inf_rate = run_df$beta_mean,
             num_inf_days = number_of_infectious_days,
             death_prob = .01,
@@ -142,6 +143,39 @@ sim_brazil_web <- function (source_df) {
   run_df$tweets <- list(sim_df$tweets)
   return(run_df)
 }
+
+
+#' Simplest model that is isomorphic to baseline.stan
+#' 
+#' @return dataframe for use in runEval.R
+sim_SIRD_easy <- function (source_df) {
+  run_df <- copy(source_df)
+  run_df$beta_mean <- .5
+  run_df$gamma <- .2
+  run_df$death_prob <- .01
+  run_df$tweet_rate <- .5
+  run_df$n_patient_zero <- 1
+  run_df$description <- "Should be easy to recover"
+  run_df$sim_run_id <- 1
+  
+  sim_df = SIRD_exact(n_pop = run_df$n_pop, 
+                     print = TRUE, 
+                     n_days = run_df$n_days,
+                     beta_daily_inf_rate = run_df$beta_mean,
+                     num_inf_days = 1/run_df$gamma,
+                     death_prob = run_df$death_prob,
+                     tweet_rate = run_df$tweet_rate,
+                     n_patient_zero = run_df$n_patient_zero,
+                     round = FALSE)
+  
+  run_df$s <- list(sim_df$s)
+  run_df$i <- list(sim_df$i)
+  run_df$r <- list(sim_df$r)
+  run_df$d <- list(sim_df$d)
+  run_df$tweets <- list(sim_df$tweets)
+  return(run_df)
+}
+
 
 
 #214,110,287
