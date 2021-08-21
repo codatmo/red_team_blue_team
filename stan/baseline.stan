@@ -27,7 +27,7 @@ functions {
   }
 
   real[,] block_sird(int days, real[] y, real[] theta, 
-             real[] x_r, int[] x_i, int debug, int I2DandR, int I2D2R) {
+             real[] x_r, int[] x_i , int debug, int I2DandR, int I2D2R) {
     real day_counts[days,4];
     real S = y[1];
     real I = y[2];
@@ -38,11 +38,12 @@ functions {
     real gamma = theta[2];
     real deathRate = theta[3];
     if (debug == 1) {
+      print("I2DandR=", I2DandR, " I2D2R=", I2D2R);
       print("beta, gamma, deathRate=", theta);  
       print("0 SIRD=", y," sum=", sum(y));
     }  
     if (I2DandR + I2D2R != 1) {
-      reject("Misconfigured Block solver, I2D2andR xor I2D2R must be 1")
+      reject("Misconfigured Block solver, I2D2andR xor I2D2R must be 1");
     }
     for (i in 1:days) {
       real dS_dt;
@@ -71,7 +72,7 @@ functions {
       D = dD_dt + D;
       day_counts[i] = {S, I, R, D};
      if (debug == 1) { 
-        print(i," SIRD=", day_counts[i], " sum=", sum(day_counts[i]));
+        print(i," SIRD=", day_counts[i], " error sum=", N - sum(day_counts[i]));
      }
     }
     return day_counts;
@@ -83,7 +84,7 @@ data {
   real iDay1;
   real rDay1;
   real dDay1;
-  int NPop;
+  int Npop;
   vector[n_days] tweets;
   vector[n_days] deaths;
   int<lower = 0, upper = 1> compute_likelihood;
@@ -100,11 +101,12 @@ data {
   real prior_death_prob_std;
   real prior_twitter_lambda;
   int days_held_out;
+  int I2DandR;
+  int I2D2R;
+  int debug;
 }
 transformed data {
   real x_r[0]; //need for ODE function
-  int x_i[1] = { NPop }; //need for ODE function
-  int debug = 0;
   int debug2 = 0;
   int n_compartments = 4;
   int sCompartment = 1;
@@ -119,6 +121,7 @@ transformed data {
   vector[n_days] deaths_munged = deaths; 
   vector[n_days] tweets_munged = tweets; 
   int n_days_train = n_days - days_held_out;
+  int x_i[1] = { Npop }; //need for ODE function
   if (compute_likelihood == 1){
     if (center == 1) {
       meanDeaths = mean(deaths);
@@ -157,7 +160,7 @@ transformed data {
 
 parameters {
   real<lower = 0, upper = 1> gamma;
-  real<lower=0, upper = 2> beta;
+  real<lower=0, upper = 1> beta;
   real<lower=0, upper = 1> deathRate;
   real<lower=.001> lambda_twitter;
   real<lower=0> normal_tweets_sd;
@@ -178,7 +181,8 @@ transformed parameters{
     y = integrate_ode_rk45(sird, compartmentStartValues , 0.0, ts, theta, x_r, x_i);
   }
   if (run_block_ODE == 1) {
-    y = block_sird(n_days, compartmentStartValues, theta, x_r, x_i, debug, 1, 0);
+    y = block_sird(n_days, compartmentStartValues, theta, x_r, x_i, debug, 
+                   I2DandR, I2D2R);
   }
   daily_counts_ODE = to_matrix(y);
 }
@@ -192,11 +196,11 @@ model {
   normal_deaths_sd ~ exponential(1);
   if (compute_likelihood == 1) { 
     for (i in 1:n_days_train) {
-      	deaths_munged[i] ~ normal(daily_counts_ODE[i, dCompartment], 
+      	deaths_munged[i] ~ normal(daily_counts_ODE[i, dCompartment]/sdDeaths, 
                                        normal_deaths_sd);
       if (run_twitter == 1) {
         tweets_munged[i] ~ normal(lambda_twitter * 
-                                  daily_counts_ODE[i, iCompartment],
+                                  daily_counts_ODE[i, iCompartment]/sdTweets,
                                           normal_tweets_sd);
       }
     }
@@ -213,19 +217,20 @@ generated quantities {
   real lambda_twitter_unscaled = lambda_twitter * sdTweets;
   //  matrix[n_days, n_compartments] ode_states = daily_counts_ODE;
   matrix[n_compartments, n_days] transposed_ode_states = daily_counts_ODE';
-  row_vector[n_days] S = transposed_ode_states[sCompartment] * sdDeaths + meanDeaths;
-  row_vector[n_days] I = transposed_ode_states[iCompartment] * sdDeaths + meanDeaths;
-  row_vector[n_days] R = transposed_ode_states[rCompartment] * sdDeaths + meanDeaths;
-  row_vector[n_days] D = transposed_ode_states[dCompartment] * sdDeaths + meanDeaths;
+  row_vector[n_days] S = transposed_ode_states[sCompartment];
+  row_vector[n_days] I = transposed_ode_states[iCompartment];
+  row_vector[n_days] R = transposed_ode_states[rCompartment];
+  row_vector[n_days] D = transposed_ode_states[dCompartment];
   for (i in 1:n_days) {
       if (run_twitter == 1) {
-        pred_tweets[i] = sdTweets * lambda_twitter * 
-                         daily_counts_ODE[i, iCompartment] + meanTweets;
+        pred_tweets[i] = normal_rng(lambda_twitter * 
+                         daily_counts_ODE[i, iCompartment] / sdTweets, 
+                         normal_tweets_sd) * sdTweets + meanTweets;
       }
       else {
         pred_tweets[i] = 0;
       }
-      pred_deaths[i] = sdDeaths * daily_counts_ODE[i, dCompartment] 
-                       + meanDeaths;
+      pred_deaths[i] = normal_rng(daily_counts_ODE[i, dCompartment] / sdDeaths,
+                                  normal_deaths_sd) * sdDeaths + meanDeaths;
   }
 }

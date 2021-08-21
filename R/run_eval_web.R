@@ -7,20 +7,15 @@ library(data.table)
 library(kableExtra)
 library(shinystan)
 
+set_cmdstan_path("/home/breck/.cmdstanr/cmdstan-2.26.1")
 source(here::here("R","util.R"))
 source(here::here("R","SIRTDsim.R"))
 source(here::here("R","sim_configs.R"))
 source(here::here("R", "data_configs.R"))
 source(here::here("R","modeling_configs.R"))
-# dependencies
-# setup run_df
 setup_run_df <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 300) # in R/util.R
 #brazil_sim_df <- sim_brazil_1(setup_run_df) # in R/sim_configs.R
 run_data_df <- data_brazil_1(setup_run_df)
-#draws_run_df <- sim_draw_params(2, run_df) # in R/sim_configs.R
-#run_data_df <- brazil_actual_df #rbind(brazil_sim_df, brazil_actual_df)
-#run_data_df <- data_web_app(setup_run_df, "data/web_app_1.csv")
-#run_data_df <- sim_brazil_web(setup_run_df)
 
 run_df <- model_stan_baseline(run_data_df) #in R/modeling_configs.R
 run_df$ode_solver <- 'block'
@@ -29,16 +24,8 @@ run_df$use_tweets <- 1
 
 run_df$reports <- list(c('graph_data','graph_tweets', 
                          'graph_d', 'graph_ODE'))
-
-
-#run_df$reports <- list(c('graph_data','plot_pred_tweets_draws', 
-#                         'plot_pred_death_draws'))
-#run_df$compute_likelihood <- 1 # compute likelihood across all runs
-#run_df$reports <- list(c('graph_sim', 'graph_tweets', 'graph_d', 'plot'))
-   #list(c('graph_sim','graph_ODE', 'graph_tweets', 'graph_d', 'plot','param_recovery'))
-# setup run_df
-# run models
 run_df$compute_likelihood <- 1
+
 j <- 0
 while (j < nrow(run_df)) {
   j <- j + 1
@@ -50,7 +37,7 @@ while (j < nrow(run_df)) {
            iDay1 = 1,
            rDay1 = 0,
            dDay1 = 0,
-           NPop = run_df[j,]$n_pop,
+           Npop = run_df[j,]$n_pop,
            tweets = unlist(run_df[j,]$tweets),
            deaths = unlist(run_df[j,]$d),
            compute_likelihood = run_df[j,]$compute_likelihood,
@@ -69,7 +56,8 @@ while (j < nrow(run_df)) {
            prior_twitter_std = 1.0,
            days_held_out = 0,
            I2DandR = 0,
-           I2D2R = 1)
+           I2D2R = 1,
+           debug = 0)
     model <- cmdstan_model(here::here("stan", "baseline.stan"))
 
     fit <- model$sample(data=stan_data,
