@@ -163,8 +163,8 @@ parameters {
   real<lower=0, upper = 1> beta;
   real<lower=0, upper = 1> deathRate;
   real<lower=.001> lambda_twitter;
-  real<lower=0> normal_tweets_sd;
-  real<lower=0> normal_deaths_sd;
+  real<lower=0.001> normal_tweets_sd;
+  real<lower=0.001> normal_deaths_sd;
 }
 transformed parameters{
   real compartmentStartValues[4] = {sDay1, iDay1, rDay1, dDay1};  
