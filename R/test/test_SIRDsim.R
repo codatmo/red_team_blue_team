@@ -2,27 +2,19 @@ library(testthat)
 
 source(here::here('R','SIRDsim.R'))
 
-test_that("SIRD test",{
-  set.seed(43614)
-  nPop = 10000
-  nWeeks = 10
-  nDays = nWeeks * 7
-  betaInfRateSim = .3
-  gammaResRateSim = 1/7
-  probTweetSim = .5
-  deathRateSim = .1
-  infStartValue = 10
+test_that("SIRD exact test",{
+  simDf = SIRD_exact(n_pop = 10000, print = TRUE, n_days = 100,
+                    beta_daily_inf_rate = .3,
+                    num_inf_days = 7,
+                    death_prob = .02,
+                    tweet_rate = .5,
+                    n_patient_zero = 10,
+                    round = TRUE)
   
-  simDf = SIRDsim(runName = 'test', nPop = nPop, nDays = nDays, print = FALSE,
-                  betaInfRate = betaInfRateSim, gammaResRate = gammaResRateSim,
-                  probTweet = probTweetSim, deathRate = deathRateSim,
-                  infStartValue = infStartValue)
-  
-  expect_equal(nrow(simDf), 70)
-  expect_equal(simDf[50,]$tweets, 862)
-  expect_equal(simDf[50,]$d, 362)
-    expect_equal(simDf[70,]$tweets, 309)
-  expect_equal(simDf[70,]$d, 714)
-  
+  expect_equal(nrow(simDf), 100)
+  expect_equal(simDf[50,]$tweets, 877)
+  expect_equal(simDf[50,]$d, 748)
+  expect_equal(simDf[70,]$tweets, 269)
+  expect_equal(simDf[70,]$d, 2573)
   })
 
