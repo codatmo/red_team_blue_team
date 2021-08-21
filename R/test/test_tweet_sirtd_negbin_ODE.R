@@ -1,7 +1,9 @@
 library(testthat)
 library(cmdstanr)
 
-test_that("Test NAs in pred_deaths", {
+set_cmdstan_path("/home/breck/.cmdstanr/cmdstan-2.27.0")
+
+test_that("Test baseline scaled params", {
     n_pop = 100
     n_days = 10
     n_patient_zero = 10
