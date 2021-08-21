@@ -72,7 +72,8 @@ countPredictionsInQuantile <- function(fit, run_df, j, print = FALSE) {
 #' @param data_df one row of the run_df with simulation data added
 #' @param hide_s Boolean to control whether to hide the s or susceptible counts
 graph_sim_data <- function(data_df, hide_s, plot) {
-    sim_df = data.frame(day = 1:data_df$n_days, 
+    if ('t' %in% data_df) { 
+      sim_df = data.frame(day = 1:data_df$n_days, 
                         tweets = unlist(data_df$tweets), 
                         s = unlist(data_df$s),
                         i = unlist(data_df$i),
@@ -80,7 +81,17 @@ graph_sim_data <- function(data_df, hide_s, plot) {
                         t = unlist(data_df$t),
                         d = unlist(data_df$d))
 
-    compartment_names <- c('s', 'i', 'r', 't', 'd')
+      compartment_names <- c('s', 'i', 'r', 't', 'd')
+    }
+    else {
+       sim_df = data.frame(day = 1:data_df$n_days, 
+                        tweets = unlist(data_df$tweets), 
+                        s = unlist(data_df$s),
+                        i = unlist(data_df$i),
+                        r = unlist(data_df$r),
+                        d = unlist(data_df$d))
+       compartment_names <- c('s', 'i', 'r', 'd')
+    }
     if (hide_s) {
       compartment_names <- compartment_names[-1]
     }
