@@ -1,6 +1,13 @@
 #todo
 # serialize run_df?? json?
 # dependencies
+# Figure out why UNINOVE model is so much better than baseline?
+# Tweets vs no-tweets
+# Explore performance against non-isomorphic models
+# Store runs on disk
+# Vary infection 
+
+
 library(tidyverse)
 library(cmdstanr)
 library(data.table)
@@ -9,21 +16,21 @@ library(shinystan)
 
 set_cmdstan_path("/home/breck/.cmdstanr/cmdstan-2.27.0")
 source(here::here("R","util.R"))
-source(here::here("R","SIRTDsim.R"))
 source(here::here("R","sim_configs.R"))
 source(here::here("R", "data_configs.R"))
 source(here::here("R","modeling_configs.R"))
 setup_run_df <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 291) # in R/util.R
-iso_basic_df <- sim_SIRD_easy(setup_run_df) # in R/sim_configs.R
-#run_data_df <- data_brazil_1(setup_run_df)
-run_df <- iso_basic_df
+#iso_basic_df <- sim_SIRD_easy(setup_run_df) # in R/sim_configs.R
+brazil_df <- data_brazil_1(setup_run_df)
+draws_df <- sim_draw_params_sird(n_sims = 20, iso_basic_df)
+iso_draws_df <- rbind(iso_basic_df,draws_df)
 
-run_df <- model_stan_baseline(iso_basic_df) #in R/modeling_configs.R
+run_df <- model_stan_baseline(brazil_df) #in R/modeling_configs.R
 run_df$ode_solver <- 'block'
-#run_df <- model_stan_UNINOVE_Brazil(run_data_df)
+#run_df <- model_stan_UNINOVE_Brazil(run_df)
 run_df$use_tweets <- 1
 
-run_df$reports <- list(c('graph_sim'))
+run_df$reports <- list(c('graph_data', 'graph_pred_deaths', 'graph_pred_tweets'))
 
 run_df$compute_likelihood <- 1
 
@@ -47,15 +54,15 @@ while (j < nrow(run_df)) {
            run_rk45_ODE = ifelse(run_df[j,]$ode_solver == 'rk45', 1, 0),
            scale = 1,
            center = 0,
-           prior_beta_mean = .5,
+           prior_beta_mean = .3,
            prior_beta_std = .2,
-           prior_gamma_mean = .2,
+           prior_gamma_mean = .3,
            prior_gamma_std = .2,
-           prior_death_prob = .01,
+           prior_death_prob = .02,
            prior_death_prob_std = .005,
            prior_twitter_lambda = 1.0,
            prior_twitter_std = 1.0,
-           days_held_out = 291-75,
+           days_held_out = 0,
            I2DandR = 0,
            I2D2R = 1,
            debug = 0)
@@ -130,12 +137,12 @@ while (j < nrow(run_df)) {
     plot <- plot_draws(plot = plot, variable = 'pred_tweets', 
                        n_columns = run_df[j,]$n_days, color = 'red', fit = fit)
   }
-  if ('graph_tweets' %in% unlist(run_df[j,]$reports)) {
+  if ('graph_pred_tweets' %in% unlist(run_df[j,]$reports)) {
     plot <- plot_predictions(plot = plot, prediction_label = 'pred_tweets',
                              fit = fit,
                              show_ribbon = TRUE)
   }
-  if ('graph_d' %in% unlist(run_df[j,]$reports)) {
+  if ('graph_pred_deaths' %in% unlist(run_df[j,]$reports)) {
     plot <- plot_predictions(plot = plot, prediction_label = 'pred_deaths',
                              fit = fit,
                              show_ribbon = TRUE)

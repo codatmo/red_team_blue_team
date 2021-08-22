@@ -50,7 +50,7 @@ data_brazil_1 <- function (source_df) {
   run_df$sim_run_id <- 0
   run_df$d <- list(brazil_df$last_available_deaths)
   run_df$tweets <- list(brazil_df$predicted_tweets) #predicted by classifier
-  run_df$reports <- list(c('graph_data'))
+  run_df$n_patient_zero <- 100 # assumes 1% death rate, 
   return(run_df)
 }
 

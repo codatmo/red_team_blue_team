@@ -162,12 +162,14 @@ parameters {
   real<lower = 0, upper = 1> gamma;
   real<lower=0, upper = 1> beta;
   real<lower=0, upper = 1> deathRate;
+  real<lower=0> iDay1_est;
   real<lower=.001> lambda_twitter;
   real<lower=0.001> normal_tweets_sd;
   real<lower=0.001> normal_deaths_sd;
+  
 }
 transformed parameters{
-  real compartmentStartValues[4] = {sDay1, iDay1, rDay1, dDay1};  
+  real compartmentStartValues[4] = {sDay1, iDay1_est, rDay1, dDay1};  
   real y[n_days, 4];
   matrix[n_days, 4] daily_counts_ODE;
   real theta[3];
@@ -194,6 +196,7 @@ model {
   lambda_twitter ~ normal(0,1);
   normal_tweets_sd ~ exponential(1);
   normal_deaths_sd ~ exponential(1);
+  iDay1_est ~ uniform(1, 100000);
   if (compute_likelihood == 1) { 
     for (i in 1:n_days_train) {
       	deaths_munged[i] ~ normal(daily_counts_ODE[i, dCompartment]/sdDeaths, 
