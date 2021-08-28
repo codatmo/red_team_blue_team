@@ -22,15 +22,19 @@ source(here::here("R","modeling_configs.R"))
 setup_run_df <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 291) # in R/util.R
 #iso_basic_df <- sim_SIRD_easy(setup_run_df) # in R/sim_configs.R
 brazil_df <- data_brazil_1(setup_run_df)
-draws_df <- sim_draw_params_sird(n_sims = 20, iso_basic_df)
-iso_draws_df <- rbind(iso_basic_df,draws_df)
+#draws_df <- sim_draw_params_sird(n_sims = 20, iso_basic_df)
+#iso_draws_df <- rbind(iso_basic_df,draws_df)
 
-run_df <- model_stan_baseline(brazil_df) #in R/modeling_configs.R
-run_df$ode_solver <- 'block'
-#run_df <- model_stan_UNINOVE_Brazil(run_df)
-run_df$use_tweets <- 1
+#run_df_brazil <- model_stan_baseline(brazil_df) #in R/modeling_configs.R
+#run_df_brazil$ode_solver <- 'block'
+run_df_brazil <- model_stan_UNINOVE_Brazil(brazil_df)
+run_df_brazil$use_tweets <- 1
+run_df_brazil_no_tweets <- copy(run_df_brazil)
+run_df_brazil_no_tweets$use_tweets <- 0
+run_df <- rbind(run_df_brazil_no_tweets, run_df_brazil)
 
-run_df$reports <- list(c('graph_data', 'graph_pred_deaths', 'graph_pred_tweets'))
+run_df$reports <- list(c('graph_data', 'graph_pred_deaths', 'graph_pred_tweets',
+                         'graph_ODE'))
 
 run_df$compute_likelihood <- 1
 
@@ -147,8 +151,9 @@ while (j < nrow(run_df)) {
                              fit = fit,
                              show_ribbon = TRUE)
   }
-#  max_y = max(unlist(run_df[j,]$pred_tweets))
-  plot = plot + xlim(0,400) + theme(legend.position = "none")
+
+  plot = plot + xlim(0, 400) + ylim(0, 200000) + theme(legend.position = "none")
+  
   if (length(unlist(run_df[j,]$reports)) > 0) {
     print(plot)
   }
