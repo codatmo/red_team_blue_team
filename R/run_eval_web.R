@@ -33,8 +33,7 @@ run_df_brazil_no_tweets <- copy(run_df_brazil)
 run_df_brazil_no_tweets$use_tweets <- 0
 run_df <- rbind(run_df_brazil_no_tweets, run_df_brazil)
 
-run_df$reports <- list(c('graph_data', 'graph_pred_deaths', 'graph_pred_tweets',
-                         'graph_ODE'))
+run_df$reports <- list(c('graph_data', 'graph_pred_deaths', 'graph_pred_tweets'))
 
 run_df$compute_likelihood <- 1
 
