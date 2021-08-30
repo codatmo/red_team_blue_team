@@ -5,7 +5,7 @@ Modified from https://mc-stan.org/users/documentation/case-studies/boarding_scho
 // #include /home/breck/git/codatmo/dataGeneratingProcess1/stan/ode_solvers.stan
 
 functions {
-  real[] sird(real t, real[] y, real[] theta, 
+  real[] sird(real t, real[] y, real[] theta,
              real[] x_r, int[] x_i) {
 
       real S = y[1];
@@ -17,16 +17,16 @@ functions {
       real beta = theta[1];
       real gamma = theta[2];
       real deathRate = theta[3];
-     
+
       real dS_dt = -beta * I * S / N;
       real dI_dt =  beta * I * S / N - gamma * I ;
       real dR_dt =  gamma * I - deathRate * R;
-      real dD_dt =  deathRate * R; 
- 
+      real dD_dt =  deathRate * R;
+
       return {dS_dt, dI_dt, dR_dt, dD_dt};
   }
 
-  real[,] block_sird(int days, real[] y, real[] theta, 
+  real[,] block_sird(int days, real[] y, real[] theta,
              real[] x_r, int[] x_i , int debug, int I2DandR, int I2D2R) {
     real day_counts[days,4];
     real S = y[1];
@@ -39,9 +39,9 @@ functions {
     real deathRate = theta[3];
     if (debug == 1) {
       print("I2DandR=", I2DandR, " I2D2R=", I2D2R);
-      print("beta, gamma, deathRate=", theta);  
+      print("beta, gamma, deathRate=", theta);
       print("0 SIRD=", y," sum=", sum(y));
-    }  
+    }
     if (I2DandR + I2D2R != 1) {
       reject("Misconfigured Block solver, I2D2andR xor I2D2R must be 1");
     }
@@ -60,18 +60,18 @@ functions {
         dS_dt = -beta * I * S / N;
         dI_dt =  beta * I * S / N - gamma * I ;
         dR_dt =  gamma * I - deathRate * R;
-        dD_dt =  deathRate * R; 
+        dD_dt =  deathRate * R;
       }
-    if (debug ==1) {  
+    if (debug ==1) {
       print("dS_dt, dI_Dt, dR_dt, dD_dt=", {dS_dt, dI_dt, dR_dt, dD_dt},
             " sum=", sum({dS_dt, dI_dt, dR_dt, dD_dt}));
-    }          
+    }
       S = dS_dt + S;
       I = dI_dt + I;
       R = dR_dt + R;
       D = dD_dt + D;
       day_counts[i] = {S, I, R, D};
-     if (debug == 1) { 
+     if (debug == 1) {
         print(i," SIRD=", day_counts[i], " error sum=", N - sum(day_counts[i]));
      }
     }
@@ -117,9 +117,9 @@ transformed data {
   real meanDeaths = 0;
   real meanTweets = 0;
   real sdDeaths = 1;
-  real sdTweets = 1; 
-  vector[n_days] deaths_munged = deaths; 
-  vector[n_days] tweets_munged = tweets; 
+  real sdTweets = 1;
+  vector[n_days] deaths_munged = deaths;
+  vector[n_days] tweets_munged = tweets;
   int n_days_train = n_days - days_held_out;
   int x_i[1] = { Npop }; //need for ODE function
   if (compute_likelihood == 1){
@@ -169,7 +169,7 @@ parameters {
   real iDay_est_exp_rate;
 }
 transformed parameters{
-  real compartmentStartValues[4] = {sDay1, iDay1_est * sdDeaths, rDay1, dDay1};  
+  real compartmentStartValues[4] = {sDay1, iDay1_est * sdDeaths, rDay1, dDay1};
   real y[n_days, 4];
   matrix[n_days, 4] daily_counts_ODE;
   real theta[3];
@@ -183,7 +183,7 @@ transformed parameters{
     y = integrate_ode_rk45(sird, compartmentStartValues , 0.0, ts, theta, x_r, x_i);
   }
   if (run_block_ODE == 1) {
-    y = block_sird(n_days, compartmentStartValues, theta, x_r, x_i, debug, 
+    y = block_sird(n_days, compartmentStartValues, theta, x_r, x_i, debug,
                    I2DandR, I2D2R);
   }
   daily_counts_ODE = to_matrix(y);
@@ -193,17 +193,17 @@ model {
   beta ~ normal(prior_beta_mean, prior_beta_std);
   gamma ~ normal(prior_gamma_mean, prior_gamma_std);
   deathRate ~ normal(prior_death_prob, prior_death_prob_std);
-  lambda_twitter ~ normal(0,1);
+  lambda_twitter ~ exponential(1);
   normal_tweets_sd ~ exponential(1);
   normal_deaths_sd ~ exponential(1);
   iDay_est_exp_rate ~ uniform(0,10);
   iDay1_est ~ exponential(iDay_est_exp_rate);
-  if (compute_likelihood == 1) { 
+  if (compute_likelihood == 1) {
     for (i in 1:n_days_train) {
-      	deaths_munged[i] ~ normal(daily_counts_ODE[i, dCompartment]/sdDeaths, 
+      	deaths_munged[i] ~ normal(daily_counts_ODE[i, dCompartment]/sdDeaths,
                                        normal_deaths_sd);
       if (run_twitter == 1) {
-        tweets_munged[i] ~ normal(lambda_twitter * 
+        tweets_munged[i] ~ normal(lambda_twitter *
                                   daily_counts_ODE[i, iCompartment]/sdTweets,
                                           normal_tweets_sd);
       }
@@ -227,8 +227,8 @@ generated quantities {
   row_vector[n_days] D = transposed_ode_states[dCompartment];
   for (i in 1:n_days) {
       if (run_twitter == 1) {
-        pred_tweets[i] = normal_rng(lambda_twitter * 
-                         daily_counts_ODE[i, iCompartment] / sdTweets, 
+        pred_tweets[i] = normal_rng(lambda_twitter *
+                         daily_counts_ODE[i, iCompartment] / sdTweets,
                          normal_tweets_sd) * sdTweets + meanTweets;
       }
       else {

@@ -76,8 +76,8 @@ model {
   omega ~ normal(prior_omega_mean, prior_omega_std);
   dI ~ normal(prior_dI_mean, prior_dI_std);
   dT ~ normal(prior_dT_mean, prior_dT_std);
-  phi_inv ~ exponential(5);
-  phi_twitter_inv ~ exponential(5);
+  phi_inv ~ exponential(1);
+  phi_twitter_inv ~ exponential(1);
   twitter_rate ~ exponential(prior_twitter_lambda);
 
   if (compute_likelihood == 1){
