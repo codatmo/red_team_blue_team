@@ -7,16 +7,15 @@ model_stan_baseline <- function(run_df) {
   #model_no_tweets_df$apply_twitter_data <- 0
   #model_no_tweets_df$description <- paste0(model_no_tweets_df$description,
   #                                         " no tweets")
-  model_tweets_df <- copy(run_df)
-  model_tweets_df$apply_twitter_data <- 1
-  model_tweets_df$description <- paste0(model_tweets_df$description,
+  model_df <- copy(run_df)
+  model_df$dir_name <- paste(model_df$dir_name, 'baseline', sep = '_')
+  model_df$apply_twitter_data <- 1
+  model_df$description <- paste0(model_df$description,
                                       " use tweets")
-  model_tweets_df$compute_likelihood <- 1
-
-  combined_df = model_tweets_df # rbind(model_no_tweets_df, model_tweets_df)
-  combined_df$ode_solver <- 'block'
-  combined_df$model_to_run <- 'baseline'
-  return(combined_df)
+  model_df$compute_likelihood <- 1
+  model_df$ode_solver <- 'block'
+  model_df$model_to_run <- 'baseline'
+  return(model_df)
 }
 
 
@@ -26,6 +25,7 @@ model_stan_baseline <- function(run_df) {
 model_stan_UNINOVE_Brazil <- function(run_df) {
   
   model_df <- copy(run_df)
+  model_df$dir_name <- paste(model_df$dir_name, 'uninove', sep = '_')
   model_df$compute_likelihood <- 1
   model_df$apply_twitter_data <- 1
   model_df$model_to_run <- 'UNINOVE_Brazil'

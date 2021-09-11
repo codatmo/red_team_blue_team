@@ -23,11 +23,12 @@ source(here::here("R","modeling_configs.R"))
 setup_run_df <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 291) # in R/util.R
 
 iso_basic_df <- sim_SIRD_easy(setup_run_df) # in R/sim_configs.R
-#brazil_df <- data_brazil_1(setup_run_df)
+iso_brazil_df <- sim_SIRD_Brazil(setup_run_df)
+brazil_df <- data_brazil_1(setup_run_df)
 #draws_df <- sim_draw_params_sird(n_sims = 20, iso_basic_df)
-#iso_draws_df <- rbind(iso_basic_df,draws_df)
+iso_draws_df <- rbind(iso_basic_df,iso_brazil_df)
 
-run_df_brazil <- model_stan_baseline(iso_basic_df) #in R/modeling_configs.R
+run_df_brazil <- model_stan_baseline(brazil_df) #in R/modeling_configs.R
 #run_df_brazil <- copy_run(run_df_brazil, '140heldOut')
 #run_df_brazil$ode_solver <- 'block'
 #run_df_brazil <- model_stan_UNINOVE_Brazil(brazil_df)
@@ -42,6 +43,7 @@ run_df <- rbind(run_df_brazil_no_tweets, run_df_brazil_use_tweets)
 run_df$reports <- list(c(''))
 
 run_df$compute_likelihood <- 1
+run_stan = TRUE
 
 j <- 0
 while (j < nrow(run_df)) {
@@ -49,12 +51,12 @@ while (j < nrow(run_df)) {
   j <- j + 1
 
   fit <- NA
-  # if (dir.exists(here::here("output",run_df[j,]$dir_name))) {
-  #   print(paste("Deleting directory", 
-  #               here::here("output", run_df[j,]$dir_name)))
-  #   unlink(here::here("output",run_df[j,]$dir_name), recursive = TRUE)
-  # }
-  # dir.create(here::here("output",run_df[j,]$dir_name))
+  if (dir.exists(here::here("output",run_df[j,]$dir_name))) {
+     print(paste("Deleting directory", 
+                 here::here("output", run_df[j,]$dir_name)))
+     unlink(here::here("output",run_df[j,]$dir_name), recursive = TRUE)
+  }
+  dir.create(here::here("output",run_df[j,]$dir_name))
   #read json
   if (run_df[j,]$model_to_run == 'baseline') {
     stan_data <-
@@ -90,11 +92,13 @@ while (j < nrow(run_df)) {
     output = here::here("output",run_df[j,]$dir_name)
     stan_exe = here::here("stan/baseline")
     write(toJSON(stan_data), data)
-    for (i in 1:4) {
-      out_file = paste0(output, "/out.", i, ".csv")
-      #system2(stan_exe, 
-      #        args=paste0("sample data file=", data, " output file=", out_file),
-      #        wait=FALSE)
+    if (run_stan) {
+        for (i in 1:4) {
+          out_file = paste0(output, "/out.", i, ".csv")
+          system2(stan_exe, 
+              args=paste0("sample data file=", data, " output file=", out_file),
+              wait = (i == 4))
+        }
     }
   }
   }

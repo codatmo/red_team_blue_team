@@ -247,6 +247,7 @@ setup_run_df <- function(seed, n_pop, n_days) {
   template_df <- data.frame(sim_run_id = c(NA))
   template_df$description <- NA
   template_df$seed <- seed
+  template_df$dir_name <- "codatmo"
 
   # any simulation/model run
   template_df$n_pop <- n_pop
@@ -281,4 +282,10 @@ setup_run_df <- function(seed, n_pop, n_days) {
   template_df$fit <- NA
   set.seed(template_df$seed)
   return(template_df)
+}
+
+copy_run <- function(run_df, dir_append_text) {
+  ret_df <- copy(run_df)
+  ret_df$dir_name <- paste(ret_df$dir_name, dir_append_text, sep='_')
+  return(ret_df)
 }

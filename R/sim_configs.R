@@ -152,22 +152,24 @@ sim_brazil_1 <- function (source_df) {
 #' the DGP website https://blooming-lake-98194.herokuapp.com/.
 #' no model configuration/reporting configured
 #' @return dataframe for use in run_eval.R
+#' Generating Parameters: n_pop=214110287, n_days=291, beta_daily_inf_rate=0.346, n_patient_zero=3419, 
+#' num_infectous_days=2.865329512893983, death_prob=0.0199, tweet_rate=0.591
 sim_brazil_web <- function (source_df) {
   run_df <- copy(source_df)
   run_df$n_pop <- 214110287
   run_df$n_days <- 291
-  run_df$beta_mean <- .19
+  run_df$beta_mean <- .346
   run_df$beta_daily_rate <- list(rep(run_df$beta_mean, 
                                           run_df$n_days))
-  number_of_infectious_days <- 7
-  run_df$gamma <- 1/7
-  run_df$death_prob <- .01
-  run_df$tweet_rate <- .2
+  number_of_infectious_days <- 2.865329512893983
+  run_df$gamma <- 1/2.865329512893983
+  run_df$death_prob <- .0199
   run_df$days2death <- 10
-  run_df$n_patient_zero <- 10
-  run_df$description <- "Brazil web app"
+  run_df$tweet_rate <- .591
+  run_df$n_patient_zero <- 3419
+  run_df$description <- "Brazil sim"
   run_df$sim_run_id <- 1
-  sim_df <- sirtd_exact(n_pop = run_df$n_pop,
+  sim_df <- sird_exact(n_pop = run_df$n_pop,
             n_days = run_df$n_days,
             print = False,
             beta_daily_inf_rate = run_df$beta_mean,
@@ -198,6 +200,7 @@ sim_SIRD_easy <- function (source_df) {
   run_df$n_patient_zero <- 1
   run_df$description <- "Should be easy to recover"
   run_df$sim_run_id <- 1
+  run_df$dir_name <- paste(run_df$dir_name, 'SIRD_easy_sim', sep = '_')
   
   sim_df = SIRD_exact(n_pop = run_df$n_pop, 
                      print = FALSE, 
@@ -208,6 +211,39 @@ sim_SIRD_easy <- function (source_df) {
                      tweet_rate = run_df$tweet_rate,
                      n_patient_zero = run_df$n_patient_zero,
                      round = FALSE)
+  
+  run_df$s <- list(sim_df$s)
+  run_df$i <- list(sim_df$i)
+  run_df$r <- list(sim_df$r)
+  run_df$d <- list(sim_df$d)
+  run_df$tweets <- list(sim_df$tweets)
+  return(run_df)
+}
+
+#' Simplest model that is isomorphic to baseline.stan
+#' #' Generating Parameters: n_pop=214110287, n_days=291, 
+#' beta_daily_inf_rate=0.346, n_patient_zero=3419, 
+#' num_infectous_days=2.865329512893983, death_prob=0.0199, tweet_rate=0.591
+#' @return dataframe for use in runEval.R
+sim_SIRD_Brazil <- function (source_df) {
+  run_df <- copy(source_df)
+  run_df$beta_mean <- .346
+  run_df$gamma <- 1/2.865329512893983
+  run_df$death_prob <- .0199
+  run_df$tweet_rate <- .591
+  run_df$n_patient_zero <- 3419
+  run_df$description <- "Based on fit of Brazil data with baseline.stan"
+  run_df$sim_run_id <- 1
+  run_df$dir_name <- paste(run_df$dir_name, 'SIRD_Brazil', sep = '_')
+  sim_df = SIRD_exact(n_pop = run_df$n_pop, 
+                      print = FALSE, 
+                      n_days = run_df$n_days,
+                      beta_daily_inf_rate = run_df$beta_mean,
+                      num_inf_days = 1/run_df$gamma,
+                      death_prob = run_df$death_prob,
+                      tweet_rate = run_df$tweet_rate,
+                      n_patient_zero = run_df$n_patient_zero,
+                      round = FALSE)
   
   run_df$s <- list(sim_df$s)
   run_df$i <- list(sim_df$i)

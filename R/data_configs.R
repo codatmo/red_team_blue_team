@@ -31,6 +31,7 @@ data_web_app <- function(source_df, file_name) {
 #' 
 #' @return dataframe for use in runEval.R
 data_brazil_1 <- function (source_df) {
+  
   brazil_df <- readRDS(here::here("data","brazil_nation_2020.rds"))
   brazil_df <- brazil_df[-(1:20),] #start with first death
   brazil_pop <- 214110287
@@ -43,6 +44,7 @@ data_brazil_1 <- function (source_df) {
   brazil_df = cbind(brazil_df,tweets_padded[1:291,])
 
   run_df <- copy(source_df)
+  run_df$dir_name <- paste(run_df$dir_name,"Brazil20", sep = '_') 
   run_df$n_pop <- brazil_pop
   run_df$n_days = nrow(brazil_df)
   run_df$n_patient_zero <- brazil_df[1,]$new_confirmed
