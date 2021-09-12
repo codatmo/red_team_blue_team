@@ -30,7 +30,8 @@ iso_draws_df <- rbind(iso_basic_df,iso_brazil_df)
 
 run_df_brazil <- model_stan_baseline(brazil_df) #in R/modeling_configs.R
 #run_df_brazil <- copy_run(run_df_brazil, '140heldOut')
-#run_df_brazil$ode_solver <- 'block'
+run_df_brazil$ode_solver <- 'rk45'
+run_df_brazil <- copy_run(run_df_brazil, 'rk45')
 #run_df_brazil <- model_stan_UNINOVE_Brazil(brazil_df)
 
 run_df_brazil_no_tweets <- copy_run(run_df_brazil, 'noTweets')
@@ -43,6 +44,7 @@ run_df <- rbind(run_df_brazil_no_tweets, run_df_brazil_use_tweets)
 run_df$reports <- list(c(''))
 
 run_df$compute_likelihood <- 1
+run_df <- copy_run(run_df,'non_centered')
 run_stan = TRUE
 
 j <- 0
@@ -72,7 +74,7 @@ while (j < nrow(run_df)) {
            run_twitter = run_df[j,]$use_tweets,
            run_block_ODE = ifelse(run_df[j,]$ode_solver == 'block', 1, 0),
            run_rk45_ODE = ifelse(run_df[j,]$ode_solver == 'rk45', 1, 0),
-           scale = 1,
+           scale = 0,
            center = 0,
            prior_beta_mean = .3,
            prior_beta_std = .2,
