@@ -29,6 +29,7 @@ parameters {
   real alpha_n_patient0;
   real beta_infection_rate;
   real sigma_deaths_sd;
+  real<lower = 0> tweet_rate;
 }
 
 model {
@@ -36,17 +37,24 @@ model {
     alpha_n_patient0 ~ normal(0, 1);
     beta_infection_rate ~ normal(0, 1);
     sigma_deaths_sd ~ exponential(1);
+    tweet_rate ~ normal(0,1);
   }
   else {
     alpha_n_patient0 ~ uniform(-10000000, 10000000);
     beta_infection_rate ~ uniform(-10000000, 10000000);
-    sigma_deaths_sd ~ uniform(-10000000, 10000000);	
+    sigma_deaths_sd ~ uniform(-10000000, 10000000);
+    tweet_rate ~ uniform(-10000000, 10000000);
   }
   if (compute_likelihood == 1) { 
     for (i in 1:n_days_train) {
       real normalized_deaths = deaths[i] / deaths_scaling;
+      real normalized_tweets = tweets[i] / tweets_scaling;
+      if (use_tweets != 1) {
+	normalized_tweets = 0;
+      }
       normalized_deaths ~ normal(alpha_n_patient0 +
-			         beta_infection_rate * i,
+			         beta_infection_rate * i +
+				 tweet_rate * normalized_tweets,
 			         sigma_deaths_sd);
     }
   }
@@ -56,8 +64,13 @@ generated quantities {
   real pred_deaths[n_days];
   real pred_tweets[n_days];
   for (i in 1:n_days) {
-    real pred_deaths_normalized = alpha_n_patient0 + beta_infection_rate * i;
+    real normalized_tweets = tweets[i] / tweets_scaling;
+    if (use_tweets != 1) {
+      normalized_tweets = 0;
+    }
+    real pred_deaths_normalized = alpha_n_patient0 +
+                                  beta_infection_rate * i +
+                                  tweet_rate * normalized_tweets;
     pred_deaths[i] = pred_deaths_normalized * deaths_scaling;
-    pred_tweets[i] = 0; 
   }
 }
