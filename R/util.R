@@ -1,5 +1,6 @@
 library(ggplot2)
 library(ggrepel)
+library(tidyverse)
 
 
 #' Count the number of truth data points contained in the quantile interval of
@@ -97,7 +98,7 @@ graph_sim_data <- function(data_df, hide_s, plot) {
     }
     i_mean = mean(sim_df$i)
     gt_mean_days = sim_df[sim_df$i >= i_mean,]$day
-    display_day = gt_mean_days[1]
+    display_day = gt_mean_days[round(length(gt_mean_days)/2)]
     sim_long_df = gather(data = sim_df, key = "compartment_sim", value = "count",
                          all_of(c('tweets', compartment_names)))
     return(plot + 
@@ -288,4 +289,24 @@ copy_run <- function(run_df, dir_append_text) {
   ret_df <- copy(run_df)
   ret_df$dir_name <- paste(ret_df$dir_name, dir_append_text, sep='_')
   return(ret_df)
+}
+#' Trims top level of data frame values to specified length in characters
+#' and returns data frame with those truncated values. 
+trim_for_printing <- function(df, length){
+  return (df %>% mutate_all(~(strtrim(., length))))
+}
+
+#' Plots simulation data and original data with headings indicating the parmams
+#' that generated the simulation
+plot_sim <- function(df_data, df_sim) {
+  plot <- ggplot(data = NULL, aes(x = day, y = count))
+  plot <- graph_real_data(data_df = df_data, plot = plot)
+  plot <- graph_sim_data(data_df = df_sim, plot = plot, hide_s = TRUE)
+  plot <- plot + xlim(0, 330) + 
+    ggtitle(paste0("beta inf=", df_sim$beta_mean, 
+                   ", gamma recov=", df_sim$gamma,
+                   "\ndeath =", df_sim$death_prob, 
+                   ", patient 0=", df_sim$n_patient_zero)) + 
+    theme(legend.position = "none")
+  return(plot)
 }
