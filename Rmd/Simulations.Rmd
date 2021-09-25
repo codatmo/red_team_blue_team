@@ -1,0 +1,82 @@
+---
+title: "Simulations Based on Brazil 2020"
+author:
+  - "Breck Baldwin"
+  - "Jose Storopoli"
+  - "Conor Rosato"
+date: "9/24/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, comment = NA, include = TRUE)
+set.seed(4857)
+```
+
+
+
+```{r}
+library(data.table)
+library(kableExtra)
+source(here::here("R","util.R"))
+source(here::here("R","sim_configs.R"))
+source(here::here("R", "data_configs.R"))
+```
+
+# Simulation runs based on Brazil 2020
+
+Below is code to extract and put Brazil 2020 data into data running infrastructure.
+Prints transposed data frame row with a 60 character limit on each entry.
+```{r}
+r1 <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 291)
+r2 <- data_brazil_2020(r1) #actual 
+kable(t(trim_for_printing(r2, 60)))
+#trim_for_printing(r2, length=10)
+```
+
+## Brazil Data Graphed
+
+Graph Brazil tweets and deaths for 2020.
+```{r}
+plot <- ggplot(data = NULL, aes(x = day, y = count))
+plot <- graph_real_data(data_df = r2, plot = plot)
+plot <- plot + xlim(0, 400) + theme(legend.position = "none")
+plot
+```
+## Simulating Brazil Data 
+
+Above Brazil data was fit with SIRD model from `baseline.stan`. The resulting 
+estimates were then used to simulate with a separate SIRD simulation model. 
+
+```{r}
+r2_sim <- sim_Brazil2020(r1)
+kable(t(trim_for_printing(r2_sim, 60)))
+```
+## Single simulation of data with actual data plotted as well.
+```{r fig.width = 6}
+plot_sim(r2, r2_sim)
+```
+
+### 8 Simulations with jittered data points
+
+Simulations that are jittered between 0 and 3x patient zero count, +-.1 for for 
+other parameters. Transposed values below, all values truncated at 15 characters.
+
+```{r}
+r2_drawn <- sim_jitter_from_sim(r2_sim, 7)
+kable(t(trim_for_printing(r2_drawn,15)))
+```
+Plots for simulations, upper left the direct simulation of Brazil 2020.
+
+```{r}
+library(gridExtra)
+plots = list()
+for (i in 1:nrow(r2_drawn)) {
+  plots[[i]] <- plot_sim(r2, r2_drawn[i,])
+} 
+```
+```{r fig.height=8}
+grid.arrange(grobs=plots, ncol=2)
+```

@@ -1,0 +1,60 @@
+---
+title: "Linear Regression Experiments"
+author: "Breck Baldwin"
+date: "9/24/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, comment = NA, include = TRUE)
+set.seed(4857)
+```
+
+```{r}
+library(cmdstanr)
+library(data.table)
+library(kableExtra)
+
+set_cmdstan_path("/home/breck/.cmdstanr/cmdstan-2.27.0")
+source(here::here("R","util.R"))
+source(here::here("R","sim_configs.R"))
+source(here::here("R", "data_configs.R"))
+source(here::here("R","modeling_configs.R"))
+
+```
+
+
+```{r}
+r1 <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 291)
+r2 <- data_brazil_2020(r1) #actual 
+r2_sim <- sim_Brazil2020(r1)
+r2_drawn <- sim_jitter_from_sim(r2_sim, 3)
+r3 <- model_stan_linear_reg(r2_drawn) #in R/modeling_configs.R
+r3$use_tweets = 1
+r4 <- model_stan_linear_reg(r2_drawn)
+r4$use_tweets = 0
+r5 = rbind(r3,r4)
+
+
+#r3_baseline <- model_stan_baseline(r2_drawn)
+#r3_baseline$use_tweets <- 0
+#r4 <- copy_run(r3_baseline,'140_trunc')
+#r4$truncate_data <- 140
+#r5 <- rbind(r3_baseline, r4)
+#run_df_brazil$ode_solver <- 'block'
+#run_df_brazil <- model_stan_UNINOVE_Brazil(brazil_df)
+
+#r6 <- copy_run(r5,'tweets')
+#r6$use_tweets <- 1
+#r7 <- copy_run(r5,'no_tweets')
+#7$use_tweets <- 0
+
+
+
+run_df <- r3_baseline
+
+run_df$reports <- list(c('graph_data', 'plot_pred_death_draws'))
+
+```
