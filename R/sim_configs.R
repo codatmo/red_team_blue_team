@@ -220,21 +220,65 @@ sim_SIRD_easy <- function (source_df) {
   return(run_df)
 }
 
+#' Jitter params from `source_df` `count` times and return df with `source_df` 
+#' plus `count` jittered simulations. Params `beta_mean`, `gamma`, `death_prob`,
+#' `tweet_rate`, are uniformly jittered by +-.1, `n_patient_zero` uniformly 
+#' jittered within 0 to 3*`n_patient_zero`
+#' @return dataframe for use in runEval.R
+sim_jitter_from_sim <- function (source_df, count) {
+  last_sim_id <- source_df$sim_run_id
+  return_df <- copy(source_df)
+  for (i in 1:count) {
+    drawn_df <- copy(source_df)
+    drawn_df$sim_run_id <- source_df$sim_run_id + 1
+    drawn_df$beta_mean <- draw_unif_prob(mean = source_df$beta_mean, 
+                                         variation = 0.1)
+    drawn_df$gamma <- draw_unif_prob(mean = source_df$gamma, variation = 0.1)
+    drawn_df$death_prob <- draw_unif_prob(mean = source_df$death_prob, 
+                                          variation = 0.1)
+    drawn_df$tweet_rate <- draw_unif_prob(mean = source_df$tweet_rate, 
+                                        variation = 0.1)
+    drawn_df$n_patient_zero <- round(runif(1, 1, source_df$n_patient_zero * 3))
+    drawn_df$description <- paste0("jitter_sim_",i)
+    drawn_df$dir_name <- paste(source_df$dir_name, paste0('jitter_sim_', i),
+                               last_sim_id, sep = '_')
+    sim_df = SIRD_exact(n_pop = drawn_df$n_pop, 
+                        print = FALSE, 
+                        n_days = drawn_df$n_days,
+                        beta_daily_inf_rate = drawn_df$beta_mean,
+                        num_inf_days = 1/drawn_df$gamma,
+                        death_prob = drawn_df$death_prob,
+                        tweet_rate = drawn_df$tweet_rate,
+                        n_patient_zero = drawn_df$n_patient_zero,
+                        round = FALSE)
+    
+    drawn_df$s <- list(sim_df$s)
+    drawn_df$i <- list(sim_df$i)
+    drawn_df$r <- list(sim_df$r)
+    drawn_df$d <- list(sim_df$d)
+    drawn_df$tweets <- list(sim_df$tweets)
+    return_df <- rbind(return_df, drawn_df)
+  }
+  return(return_df)
+}
+
+
+
 #' Simplest model that is isomorphic to baseline.stan
 #' #' Generating Parameters: n_pop=214110287, n_days=291, 
 #' beta_daily_inf_rate=0.346, n_patient_zero=3419, 
 #' num_infectous_days=2.865329512893983, death_prob=0.0199, tweet_rate=0.591
 #' @return dataframe for use in runEval.R
-sim_SIRD_Brazil <- function (source_df) {
+sim_Brazil2020 <- function (source_df) {
   run_df <- copy(source_df)
   run_df$beta_mean <- .346
   run_df$gamma <- 1/2.865329512893983
   run_df$death_prob <- .0199
   run_df$tweet_rate <- .591
   run_df$n_patient_zero <- 3419
-  run_df$description <- "Based on fit of Brazil data with baseline.stan"
+  run_df$description <- "Fit of Brazil data with baseline.stan"
   run_df$sim_run_id <- 1
-  run_df$dir_name <- paste(run_df$dir_name, 'SIRD_Brazil', sep = '_')
+  run_df$dir_name <- paste(run_df$dir_name, 'sim_Brazil2020', sep = '_')
   sim_df = SIRD_exact(n_pop = run_df$n_pop, 
                       print = FALSE, 
                       n_days = run_df$n_days,
