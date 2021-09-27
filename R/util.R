@@ -112,7 +112,7 @@ graph_sim_data <- function(data_df, hide_s, plot) {
     
 }
 
-graph_real_data <- function(data_df, plot) {
+graph_observed_data <- function(data_df, plot) {
   real_deaths_data_df <- data.frame(count = unlist(data_df$d), 
                              day = 1:data_df$n_days,
                              source = 'deaths')
@@ -190,10 +190,10 @@ plot_predictions <- function(plot, prediction_label, fit, show_ribbon = TRUE) {
     return(plot)
 }
 
-plot_draws <- function(plot, variable, n_columns, color, fit) {
+plot_draws <- function(plot, variable, n_columns, n_draws = 40, color, fit) {
 
   drawsDf <- fit$draws(variables = c(variable), format = 'draws_df')
-  sample_size = 40
+  sample_size = n_draws
   sampleDrawsDf <- drawsDf[sample(nrow(drawsDf), sample_size, replace = FALSE),]
   colnames(sampleDrawsDf)[1:n_columns] <- 1:n_columns
   longSampleDrawsDf <- gather(sampleDrawsDf, key=day, value=variable,
@@ -248,7 +248,7 @@ setup_run_df <- function(seed, n_pop, n_days) {
   template_df <- data.frame(sim_run_id = c(NA))
   template_df$description <- NA
   template_df$seed <- seed
-  template_df$dir_name <- "codatmo"
+  template_df$dir_name <- "CoDatMo"
 
   # any simulation/model run
   template_df$n_pop <- n_pop
@@ -268,20 +268,20 @@ setup_run_df <- function(seed, n_pop, n_days) {
   template_df$tweets <- list(c())
 
   #needed for sims
-  template_df$beta_daily_rate <- NA
+#  template_df$beta_daily_rate <- NA
   template_df$beta_mean <- NA
   template_df$gamma <- NA
   template_df$death_prob <- NA
   template_df$tweet_rate <- NA
   template_df$days2death <- NA
   
-  template_df$reports <- NA
+  # template_df$reports <- NA
   
   # setup prediction columns
-  template_df$d_in_interval <- NA_integer_
-  template_df$tweets_in_interval <- NA_integer_
+  # template_df$d_in_interval <- NA_integer_
+  # template_df$tweets_in_interval <- NA_integer_
   template_df$fit <- NA
-  set.seed(template_df$seed)
+  #set.seed(template_df$seed)
   return(template_df)
 }
 
@@ -300,7 +300,7 @@ trim_for_printing <- function(df, length){
 #' that generated the simulation
 plot_sim <- function(df_data, df_sim) {
   plot <- ggplot(data = NULL, aes(x = day, y = count))
-  plot <- graph_real_data(data_df = df_data, plot = plot)
+  plot <- graph_observed_data(data_df = df_data, plot = plot)
   plot <- graph_sim_data(data_df = df_sim, plot = plot, hide_s = TRUE)
   plot <- plot + xlim(0, 330) + 
     ggtitle(paste0("beta inf=", df_sim$beta_mean, 
