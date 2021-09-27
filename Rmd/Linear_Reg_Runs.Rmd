@@ -1,6 +1,6 @@
 ---
 title: "Linear Regression Experiments"
-author: "Breck Baldwin"
+author: ""
 date: "9/24/2021"
 output:
   html_document: default
@@ -16,26 +16,147 @@ set.seed(4857)
 library(cmdstanr)
 library(data.table)
 library(kableExtra)
-
+library(rjson)
+library(gridExtra)
 set_cmdstan_path("/home/breck/.cmdstanr/cmdstan-2.27.0")
 source(here::here("R","util.R"))
 source(here::here("R","sim_configs.R"))
 source(here::here("R", "data_configs.R"))
 source(here::here("R","modeling_configs.R"))
-
 ```
+# Running linear regression on Brazil simulations
+
+The 2020 data looks like a candidate for fitting with linear regression. First
+we collect the actual data in `r2` and apply a simulated version with `r2_sim`. 
 
 
 ```{r}
 r1 <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 291)
 r2 <- data_brazil_2020(r1) #actual 
 r2_sim <- sim_Brazil2020(r1)
+```
+
+The below plot shows a reasonable emulation of the real data with simulated SIRD
+output from the SIRD model `baseline.stan`. 
+
+```{r fig.width = 6}
+plot_sim(r2, r2_sim)
+```
+## Linear Regression
+
+How well does linear regression fit the deaths? We will use simulated data. 
+
+First we have to add configuration for running a Stan model:
+
+```{r}
+r3 <- model_stan_linear_reg(r2_sim) #in R/modeling_configs.R
+kable(t(trim_for_printing(r3,60)))
+```
+
+Code for running `stan/linear_reg.stan`:
+```{r}
+run_linear_regression <- function(run_df) {
+  j <- 0
+  while (j < nrow(run_df)) {
+    j <- j + 1
+    fit <- NA
+    if (dir.exists(here::here("output",run_df[j,]$dir_name))) {
+      print(paste("Deleting directory", 
+                  here::here("output", run_df[j,]$dir_name)))
+      unlink(here::here("output",run_df[j,]$dir_name), recursive = TRUE)
+    }
+    dir.create(here::here("output",run_df[j,]$dir_name))
+    stan_data <-
+      list(n_days = run_df[j,]$n_days,
+           tweets = unlist(run_df[j,]$tweets),
+           deaths = unlist(run_df[j,]$d),
+           compute_likelihood = run_df[j,]$compute_likelihood,
+           use_tweets = run_df[j,]$use_tweets,
+           scale = run_df[j,]$scale,
+           days_held_out = run_df[j,]$truncate_data,
+           debug = 0)
+    model <- cmdstan_model(here::here("stan", "linear_reg.stan"))
+    write(toJSON(run_df[j,]), here::here("output",run_df[j,]$dir_name, 
+                                         "config.json"))
+    data = here::here("output",run_df[j,]$dir_name, "data.json")
+    write(toJSON(stan_data), data)
+    fit <- model$sample(data=stan_data,
+                        output_dir = here::here("output/",run_df[j,]$dir_name),
+                        parallel_chains = 4,
+                        iter_warmup = 1000,
+                        iter_sampling = 1000,
+                        chains = 4,
+                        seed = 4857)
+    run_df[j,]$fit = list(fit)
+  }
+}
+```
+
+### Prior predictive check
+
+We start with the traditional prior predictive check. 
+
+```{r}
+plot_pred_check <- function(df, fit, n_draws) {
+  plot <- ggplot(data = NULL, aes(x = day, y = count))
+  plot <- plot_draws(plot = plot, variable = 'pred_deaths', n_draws = n_draws,
+                     n_columns = df$n_days, 
+                    'blue', fit)
+  plot <- graph_observed_data(data_df = df, plot = plot)
+  plot <- plot + xlim(0, 330) +
+  theme(legend.position = "none")
+}
+```
+
+```{r}
+r3$use_tweets <- 0
+r3$compute_likelihood <- 0
+r3$scale <- 0
+run_linear_regression(r3)
+fit3 <- as_cmdstan_fit(files = list.files(path=here::here("output",r3$dir_name), 
+                                         pattern = "*.csv$", full.names = TRUE))
+r4 <- copy_run(r3,"scale")
+r4$scale <- 1
+run_linear_regression(r4)
+fit4 <- as_cmdstan_fit(files = list.files(path=here::here("output",r4$dir_name), 
+                                         pattern = "*.csv$", full.names = TRUE))
+```
+```{r}
+
+plot3 = plot_pred_check(r3, fit3, 4000) + ylim(0,200000) +
+  ggtitle("Prior Predictive Check for Deaths", subtitle = "stan/linear_reg.stan, non-scaled")
+
+plot4 = plot_pred_check(r4, fit4, 4000) + ylim(0,200000) +
+  ggtitle("Prior Predictive Check for Deaths", subtitle = "stan/linear_reg.stan, scaled")
+
+grid.arrange(plot3, plot4, ncol=2)
+```
+
+
+```{r}
+r5 <- copy_run(r3, 'post-pred-check')
+r5$use_tweets <- 1 #don't predict tweets
+r5$compute_likelihood <- 1
+r5$scale <- 1
+run_linear_regression(r5)
+fit5 <- as_cmdstan_fit(files = list.files(path=here::here("output",r5$dir_name), 
+                                         pattern = "*.csv$", full.names = TRUE))
+plot5 = plot_pred_check(r5, fit5, 40) +
+  ggtitle("Posterior Predictive Check for Deaths", subtitle = "stan/linear_reg.stan, scaled")
+plot5
+
+```
+
+```{r}
 r2_drawn <- sim_jitter_from_sim(r2_sim, 3)
 r3 <- model_stan_linear_reg(r2_drawn) #in R/modeling_configs.R
 r3$use_tweets = 1
 r4 <- model_stan_linear_reg(r2_drawn)
 r4$use_tweets = 0
 r5 = rbind(r3,r4)
+```
+
+
 
 
 #r3_baseline <- model_stan_baseline(r2_drawn)
