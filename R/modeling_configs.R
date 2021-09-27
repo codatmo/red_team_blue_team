@@ -50,6 +50,7 @@ model_stan_linear_reg <- function(run_df) {
   model_df$compute_likelihood <- 1
   model_df$model_to_run <- 'linear_reg'
   model_df$truncate_data <- 0
+  model_df$scale <- 1
   return(model_df)
 }
 
