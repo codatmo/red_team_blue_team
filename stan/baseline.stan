@@ -80,19 +80,14 @@ functions {
 }
 data {
   int<lower=1> n_days;
-  real sDay1;
-  real iDay1;
-  real rDay1;
-  real dDay1;
   int Npop;
   vector[n_days] tweets;
   vector[n_days] deaths;
   int<lower = 0, upper = 1> compute_likelihood;
-  int<lower = 0, upper = 1> run_twitter;
+  int<lower = 0, upper = 1> use_tweets;
   int<lower = 0, upper = 1> run_block_ODE;
   int<lower = 0, upper = 1> run_rk45_ODE;
   int<lower = 0, upper = 1> scale;
-  int<lower = 0, upper = 1> center;
   real prior_beta_mean;
   real prior_beta_std;
   real prior_gamma_mean;
@@ -118,28 +113,18 @@ transformed data {
   real meanTweets = 0;
   real sdDeaths = 1;
   real sdTweets = 1; 
-  vector[n_days] deaths_munged = deaths; 
-  vector[n_days] tweets_munged = tweets; 
   int n_days_train = n_days - days_held_out;
   int x_i[1] = { Npop }; //need for ODE function
   if (compute_likelihood == 1){
-    if (center == 1) {
-      meanDeaths = mean(deaths);
-      deaths_munged = deaths_munged - meanDeaths;
-      meanTweets = mean(tweets);
-      tweets_munged = tweets_munged - meanTweets;
-    }
     if (scale == 1) {
       sdDeaths = sd(deaths);
       if (sdDeaths == 0) {
        reject("Standard deviation of zero for deaths");
       }
-      deaths_munged = deaths_munged/sdDeaths;
       sdTweets = sd(tweets);
       if (sdTweets == 0) {
         reject("Standard deviation of zero for tweets");
       }
-      tweets_munged = tweets_munged/sdTweets;
     }
   }
   ts[1] = 1.0;
@@ -148,10 +133,6 @@ transformed data {
   }
   if (compute_likelihood == 1) {
     print("SD tweets=", sdTweets, "SD deaths=",sdDeaths);
-    print("tweets", tweets);
-    print("tweets_munged", tweets_munged);
-    print("deaths", deaths);
-    print("deaths_munged", deaths_munged);
   }
   else {
     print("Not running likelihood");
@@ -169,7 +150,8 @@ parameters {
   real iDay_est_exp_rate;
 }
 transformed parameters{
-  real compartmentStartValues[4] = {sDay1, iDay1_est * sdDeaths, rDay1, dDay1};  
+  real iDay1 = iDay1_est * sdDeaths;
+  real compartmentStartValues[4] = {Npop - iDay1, iDay1, 0, 0};  
   real y[n_days, 4];
   matrix[n_days, 4] daily_counts_ODE;
   real theta[3];
@@ -200,10 +182,10 @@ model {
   iDay1_est ~ exponential(iDay_est_exp_rate);
   if (compute_likelihood == 1) { 
     for (i in 1:n_days_train) {
-      	deaths_munged[i] ~ normal(daily_counts_ODE[i, dCompartment]/sdDeaths, 
+      	deaths[i]/sdDeaths ~ normal(daily_counts_ODE[i, dCompartment]/sdDeaths, 
                                        normal_deaths_sd);
-      if (run_twitter == 1) {
-        tweets_munged[i] ~ normal(lambda_twitter * 
+      if (use_tweets == 1) {
+        tweets[i]/sdTweets ~ normal(lambda_twitter * 
                                   daily_counts_ODE[i, iCompartment]/sdTweets,
                                           normal_tweets_sd);
       }
@@ -226,15 +208,15 @@ generated quantities {
   row_vector[n_days] R = transposed_ode_states[rCompartment];
   row_vector[n_days] D = transposed_ode_states[dCompartment];
   for (i in 1:n_days) {
-      if (run_twitter == 1) {
+      if (use_tweets == 1) {
         pred_tweets[i] = normal_rng(lambda_twitter * 
                          daily_counts_ODE[i, iCompartment] / sdTweets, 
-                         normal_tweets_sd) * sdTweets + meanTweets;
+                         normal_tweets_sd) * sdTweets;
       }
       else {
         pred_tweets[i] = 0;
       }
       pred_deaths[i] = normal_rng(daily_counts_ODE[i, dCompartment] / sdDeaths,
-                                  normal_deaths_sd) * sdDeaths + meanDeaths;
+                                  normal_deaths_sd) * sdDeaths;
   }
 }
