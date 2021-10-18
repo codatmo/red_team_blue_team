@@ -276,7 +276,7 @@ sim_Brazil2020 <- function (source_df) {
   run_df$death_prob <- .0199
   run_df$tweet_rate <- .591
   run_df$n_patient_zero <- 3419
-  run_df$description <- "Fit of Brazil data with baseline.stan"
+  run_df$description <- "Simulated Brazil data from baseline.stan fit"
   run_df$sim_run_id <- 1
   run_df$dir_name <- paste(run_df$dir_name, 'sim_Brazil2020', sep = '_')
   sim_df = SIRD_exact(n_pop = run_df$n_pop, 

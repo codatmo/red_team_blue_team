@@ -11,7 +11,7 @@ model_stan_baseline <- function(run_df) {
   model_df$dir_name <- paste(model_df$dir_name, 'baseline', sep = '_')
   model_df$apply_twitter_data <- 1
   model_df$description <- paste0(model_df$description,
-                                      " use tweets")
+                                      " baseline block")
   model_df$compute_likelihood <- 1
   model_df$ode_solver <- 'block'
   model_df$model_to_run <- 'baseline'
