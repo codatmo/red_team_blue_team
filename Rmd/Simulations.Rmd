@@ -41,7 +41,7 @@ kable(t(trim_for_printing(r2, 60)))
 Graph Brazil tweets and deaths for 2020.
 ```{r}
 plot <- ggplot(data = NULL, aes(x = day, y = count))
-plot <- graph_real_data(data_df = r2, plot = plot)
+plot <- graph_observed_data(data_df = r2, plot = plot)
 plot <- plot + xlim(0, 400) + theme(legend.position = "none")
 plot
 ```
