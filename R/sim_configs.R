@@ -1,6 +1,7 @@
-source(here::here("R","util.R"))
-source(here::here("R","SIRTDsim.R"))
-source(here::here("R","SIRDsim.R"))
+source(here::here("R", "util.R"))
+source(here::here("R", "SIRTDsim.R"))
+source(here::here("R", "SIRDsim.R"))
+source(here::here("R", "SIvRDsim.R"))
 
 # Each run is a row in runDf, the rows contain all information necessary to run
 # an experiment. The data in the columns can vary based on whether a sim is being
@@ -262,7 +263,47 @@ sim_jitter_from_sim <- function (source_df, count) {
   return(return_df)
 }
 
-
+#' Adds source_df$daily_betas vector that are normally drawn from the 
+#' source_df$beta_mean with sd standard deviation per specified epoch. The 
+#' existing simulation values are overwritten with simulated values reflected
+#' in the epoch beta.  
+#' @param source_df run data frame with simulation params
+#' @param sd standard deviation for draws in varying normal distribution
+#' @param epoch how many days an epoch is
+#' @return run data frame with varying betas and corresponding simulation values
+vary_beta_by_epoch <- function(source_df, sd, epoch) {
+  return_df <- data.frame()
+  for (i in 1:nrow(source_df)) {
+    drawn_df <- copy(source_df[i,])
+    beta <- drawn_df$beta_mean
+    betas <- c()
+    epoch_beta = beta
+    for (d in 1:drawn_df$n_days) {
+      if (d %% epoch == 0) {
+        epoch_beta = rnorm(1, mean = beta, sd = sd)
+      }
+      betas <- c(betas, epoch_beta)
+    }
+    drawn_df$daily_betas = list(betas)
+    sim_df = SIvRD(n_pop = drawn_df$n_pop, 
+                   print = FALSE,  
+                   n_days = drawn_df$n_days,
+                   beta_daily_inf_rate = unlist(drawn_df$daily_betas),
+                   num_inf_days = 1/drawn_df$gamma,
+                   death_prob = drawn_df$death_prob,
+                   tweet_rate = drawn_df$tweet_rate,
+                   n_patient_zero = drawn_df$n_patient_zero,
+                   round = FALSE)
+    
+    drawn_df$s <- list(sim_df$s)
+    drawn_df$i <- list(sim_df$i)
+    drawn_df$r <- list(sim_df$r)
+    drawn_df$d <- list(sim_df$d)
+    drawn_df$tweets <- list(sim_df$tweets)
+    return_df <- rbind(return_df, drawn_df)
+  }
+  return(return_df)
+}
 
 #' Simplest model that is isomorphic to baseline.stan
 #' #' Generating Parameters: n_pop=214110287, n_days=291, 

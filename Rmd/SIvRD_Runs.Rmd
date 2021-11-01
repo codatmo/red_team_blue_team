@@ -1,0 +1,443 @@
+---
+title: "Baseline SIRD Runs"
+author: "Breck Baldwin"
+date: "10/10/2021"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, comment = NA, include = TRUE)
+set.seed(4857)
+```
+
+```{r}
+library(cmdstanr)
+library(data.table)
+library(kableExtra)
+library(rjson)
+library(gridExtra)
+set_cmdstan_path("/home/breck/.cmdstanr/cmdstan-2.27.0")
+source(here::here("R","util.R"))
+source(here::here("R","sim_configs.R"))
+source(here::here("R", "data_configs.R"))
+source(here::here("R","modeling_configs.R"))
+```
+# Running linear regression on Brazil simulations
+
+The 2020 data looks like a candidate for fitting with linear regression. First
+we collect the actual data in `r2` and apply a simulated version with `r2_sim`. 
+
+
+```{r}
+r1 <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 291)
+r2 <- data_brazil_2020(r1) #actual 
+r2_sim <- sim_Brazil2020(r1)
+```
+
+The below plot shows a reasonable emulation of the real data with simulated SIRD
+output from the SIRD model `baseline.stan`. 
+
+```{r fig.width = 6}
+plot_sim(r2, r2_sim)
+```
+## Baseline SIRD 
+
+How well does the SIvRD model fit the deaths? We will use simulated data. 
+
+First we have to add configuration for running a Stan model:
+
+```{r}
+r3 <- model_stan_baseline(r2) #in R/modeling_configs.R
+kable(t(trim_for_printing(r3,60)))
+```
+
+Code for running `stan/SIvRD.stan`:
+```{r}
+run_SIvRD <- function(run_df) {
+  j <- 0
+  while (j < nrow(run_df)) {
+    j <- j + 1
+    fit <- NA
+    if (dir.exists(here::here("output",run_df[j,]$dir_name))) {
+      print(paste("Deleting directory", 
+                  here::here("output", run_df[j,]$dir_name)))
+      unlink(here::here("output",run_df[j,]$dir_name), recursive = TRUE)
+    }
+    dir.create(here::here("output",run_df[j,]$dir_name))
+    stan_data <-
+      list(n_days = run_df[j,]$n_days,
+           sDay1 = run_df[j,]$n_pop - 1,
+           iDay1 = 1,
+           rDay1 = 0,
+           dDay1 = 0,
+           center = 0,
+           run_twitter = run_df[j,]$use_tweets,
+           Npop = run_df[j,]$n_pop,
+           tweets = unlist(run_df[j,]$tweets),
+           deaths = unlist(run_df[j,]$d),
+           compute_likelihood = run_df[j,]$compute_likelihood,
+           use_tweets = run_df[j,]$use_tweets,
+           run_block_ODE = ifelse(run_df[j,]$ode_solver == 'block', 1, 0),
+           run_rk45_ODE = ifelse(run_df[j,]$ode_solver == 'rk45', 1, 0),
+           scale = run_df[j,]$scale,
+           prior_beta_mean = .3,
+           prior_beta_std = .2,
+           prior_gamma_mean = .3,
+           prior_gamma_std = .2,
+           prior_death_prob = .02,
+           prior_death_prob_std = .005,
+           prior_twitter_lambda = 1.0,
+           prior_twitter_std = 1.0,
+           I2DandR = 0,
+           I2D2R = 1,
+           days_held_out = run_df[j,]$truncate_data,
+           debug = 0,
+           beta_epoch = 30)
+    model <- cmdstan_model(here::here("stan", "SIvRD.stan"))
+    write(toJSON(run_df[j,]), here::here("output",run_df[j,]$dir_name, 
+                                         "config.json"))
+    data = here::here("output",run_df[j,]$dir_name, "data.json")
+    write(toJSON(stan_data), data)
+    fit <- model$sample(data=stan_data,
+                        output_dir = here::here("output/",run_df[j,]$dir_name),
+                        parallel_chains = 4,
+                        iter_warmup = 1000,
+                        iter_sampling = 1000,
+                        chains = 4,
+                        seed = 4857)
+    run_df[j,]$fit = list(fit)
+  }
+}
+```
+
+### Prior predictive check
+
+We start with the traditional prior predictive check on actual data.
+
+
+```{r}
+r3$use_tweets <-  0
+r3$compute_likelihood <- 0
+#run_baseline_SIRD(r3)
+#fit3 <- as_cmdstan_fit(files = list.files(path=here::here("output",r3$dir_name), 
+#                                         pattern = "*.csv$", full.names = TRUE))
+r4 <- copy_run(r3,"prior_pc")
+r4$scale <- 0
+run_SIvRD(r4)
+fit4 <- as_cmdstan_fit(files = list.files(path=here::here("output",r4$dir_name), 
+                                         pattern = "*.csv$", full.names = TRUE))
+```
+```{r}
+
+#plot3 = plot_pred_check(r3, fit3, 4000) + ylim(0,200000) +
+#  ggtitle("Prior Predictive Check for Deaths", subtitle = "stan/linear_reg.stan, non-scaled")
+
+plot4 = plot_pred_check(r4, fit4, 400) + ylim(0,200000) +
+  ggtitle("Prior Predictive Check for Deaths", subtitle = "stan/baseline.stan, scaled")
+plot4
+
+#grid.arrange(plot3, plot4, ncol=2)
+```
+
+Not too sure what to think of the above plot. The predicted deaths are predicted
+but the shapes are all wrong. Got the following warnings:
+
+Warning: 2113 of 4000 (53.0%) transitions ended with a divergence.
+This may indicate insufficient exploration of the posterior distribution.
+Possible remedies include: 
+  * Increasing adapt_delta closer to 1 (default is 0.8) 
+  * Reparameterizing the model (e.g. using a non-centered parameterization)
+  * Using informative or weakly informative prior distributions 
+
+```{r}
+fit4
+```
+
+The summary appears to cover the fitted parameters used to create the simulated data.
+
+### Prior predictive check on simulated data
+
+How does the check work with simulated SIRD output?
+
+
+```{r}
+
+r3_sim <- model_stan_baseline(r2_sim)
+r3_sim$use_tweets <-  0
+r3_sim$compute_likelihood <- 0
+r3_sim$scale <- 0
+#run_baseline_SIRD(r3)
+#fit3 <- as_cmdstan_fit(files = list.files(path=here::here("output",r3$dir_name), 
+#                                         pattern = "*.csv$", full.names = TRUE))
+r4_sim <- copy_run(r3_sim,"prior_pc")
+run_SIvRD(r4_sim)
+fit4_sim <- as_cmdstan_fit(files = list.files(path=here::here("output",r4_sim$dir_name), 
+                                         pattern = "*.csv$", full.names = TRUE))
+
+```
+
+
+```{r}
+
+plot4_sim = plot_pred_check(r4, fit4_sim, 400) + ylim(0,200000) +
+  ggtitle("Prior Predictive Check for Deaths Simulated Data", subtitle = "stan/baseline.stan, scaled")
+plot4_sim
+
+#grid.arrange(plot3, plot4, ncol=2)
+```
+
+## Posterior predictive check simulated Brazil data
+
+```{r}
+
+r5_sim <- copy_run(r3_sim,"post_pc_Iv")
+r5_sim$use_tweets <- 0 
+r5_sim$scale <- 1
+r5_sim$compute_likelihood <- 1
+run_SIvRD(r5_sim)
+fit5_sim <- as_cmdstan_fit(files = list.files(path=here::here("output",r5_sim$dir_name), 
+                                         pattern = "*.csv$", full.names = TRUE))
+
+plot5 = plot_pred_check(r5_sim, fit5_sim, 40) +
+  ggtitle("Posterior Predictive Check for Deaths Sim Data", subtitle = "stan/baseline.stan, scaled")
+plot5
+
+```
+
+Very tight fit. Lets compare to the actual data:
+```{r}
+
+r <- copy_run(r3,"post_pc_real_data_Iv")
+r$use_tweets <- 0 
+r$scale <- 1
+r$compute_likelihood <- 1
+run_SIvRD(r)
+fit <- as_cmdstan_fit(files = list.files(path=here::here("output",r$dir_name), 
+                                         pattern = "*.csv$", full.names = TRUE))
+
+plot = plot_pred_check(r, fit, 40) +
+  ggtitle("Posterior Predictive Check for Deaths Real Data", subtitle = "stan/baseline.stan, scaled")
+plot
+```
+
+Less tight a fit, the standard deviation of the estimates is clear and doing a good job of covering
+the data. 
+
+Lets add tweets to the predictions
+
+```{r}
+
+
+r <- copy_run(r3,"post_pc_real_data_tweets")
+r$use_tweets <- 1
+r$scale <- 1
+r$compute_likelihood <- 1
+run_SIvRD(r)
+
+```
+```{r}
+fit <- as_cmdstan_fit(files = list.files(path=here::here("output",r$dir_name), 
+                                         pattern = "*.csv$", full.names = TRUE))
+
+plot_pred_check(r, fit, 40) +
+  ggtitle("Posterior Predictive Check for Deaths Real Data + tweets", subtitle = "stan/baseline.stan, scaled")
+plot
+```
+
+
+## Plot Brazil simulation with varied beta 7 day epoch
+
+```{r}
+r_model <- model_stan_baseline(r2_sim)
+runs = data.frame()
+for (i in 1:6) {
+  r_copy <- copy_run(r_model,paste0("Iv",i))
+  runs <- rbind(runs,r_copy)
+}
+r <- vary_beta_by_epoch(runs, sd=.1 , epoch=7)
+r$use_tweets <- 0
+r$scale <- 1
+```
+
+```{r}
+run_SIvRD(r)
+```
+
+```{r fig.height=8}
+plots = list()
+for (i in 1:nrow(r)) {
+  #plots[[i]] <- plot_sim(r2, r2_drawn[i,])
+  fit <- as_cmdstan_fit(files = list.files(path=here::here("output",r[i,]$dir_name), 
+                                         pattern = "*.csv$", full.names = TRUE))
+  plots[[i]] <- plot_pred_check(r[i,], fit, 40)
+} 
+grid.arrange(grobs=plots, ncol=2)
+```
+
+## Compare recovered betas from simulated betas
+
+```{r fig.height=8}
+plots = list()
+for (i in 1:nrow(r)) {
+  #plots[[i]] <- plot_sim(r2, r2_drawn[i,])
+  fit <- as_cmdstan_fit(files = list.files(path=here::here("output",r[i,]$dir_name), 
+                                         pattern = "*.csv$", full.names = TRUE))
+  
+  #plot_sim <- function(df_data, df_sim) {
+  df_sim <- data.frame(day = 1:r[i,]$n_days, 
+             beta = unlist(r[i,]$daily_betas),
+             sim_or_est = rep(paste("sim", i) ,r[i,]$n_days))
+  
+  plot <- ggplot(data = NULL, aes(x=day, y=beta))
+  plot <- plot_draws(plot = plot, variable = 'beta', n_draws = 20, n_columns=r[i,]$n_days, 
+                     color='blue', fit=fit, y_label = 'beta') +
+    geom_line(data = df_sim, aes(color = sim_or_est))
+  plots[[i]] <- plot
+  
+}
+grid.arrange(grobs=plots, ncol=2)
+```
+## Plot Brazil simulation with varied beta 30 day epoch
+
+```{r}
+r_model <- model_stan_baseline(r2_sim)
+r = data.frame()
+for (i in 1:6) {
+  r_copy <- copy_run(r_model,paste0("Iv",i))
+  r_i <- vary_beta_by_epoch(r_copy, sd=.1 , epoch=30)
+  r_i$use_tweets <- 0
+  r_i$scale <- 1
+  #plot <- plot <- ggplot(data = NULL, aes(x=day, y=beta))
+  #print(plot_varied_betas(r, plot = plot))
+  r <- rbind(runs,r_i)
+}
+
+
+```
+
+```{r}
+run_SIvRD(r)
+```
+
+```{r fig.height=8}
+plots = list()
+for (i in 1:nrow(r)) {
+  #plots[[i]] <- plot_sim(r2, r2_drawn[i,])
+  fit <- as_cmdstan_fit(files = list.files(path=here::here("output",r[i,]$dir_name), 
+                                         pattern = "*.csv$", full.names = TRUE))
+  plots[[i]] <- plot_pred_check(r[i,], fit, 40)
+} 
+grid.arrange(grobs=plots, ncol=2)
+```
+
+## Compare recovered betas from simulated betas
+
+```{r fig.height=8}
+plot_varied_betas <- function(r, plot) {
+   df_sim <- data.frame(day = 1:r$n_days, 
+               beta = unlist(r$daily_betas),
+               sim = rep(paste("sim", i) ,r$n_days))
+   return (plot + geom_line(data = df_sim, aes(color = sim)))
+}
+
+plot_varied_betas_and_sims <- function(r, n_draws){
+  plots = list()
+  for (i in 1:nrow(r)) {
+    #plots[[i]] <- plot_sim(r2, r2_drawn[i,])
+    fit <- as_cmdstan_fit(files =
+                            list.files(path=here::here("output",r[i,]$dir_name), 
+                                       pattern = "*.csv$", full.names = TRUE))
+    
+    plot <- ggplot(data = NULL, aes(x=day, y=beta))
+    plot <- plot_predictions(plot, prediction_label = 'beta', fit = fit,
+                             show_ribbon = TRUE, y_label = 'beta') 
+    #plot <- plot_draws(plot = plot, variable = 'beta', n_draws = n_draws, 
+    #                   n_columns=r[i,]$n_days, color='blue', fit=fit, 
+    #                   y_label = 'beta')
+      
+    plots[[i]] <- plot_varied_betas(r[i,], plot = plot)
+    
+  }
+  return(plots)
+}
+plots <- plot_varied_betas_and_sims(r, n_draws = 20)
+grid.arrange(grobs = plots, ncol = 2)
+```
+
+what does beta plot look like for one beta epoch?
+graph mean/ribbon as well
+match epoch in model to sim epoch
+
+
+
+## Show fits for data jittered from Brazil data
+
+
+```{r}
+r2_drawn <- sim_jitter_from_sim(r2_sim, 3)
+rj <- model_stan_baseline(r2_drawn) #in R/modeling_configs.R
+rj$use_tweets <- 1
+rj$compute_likelihood <- 1
+rj$scale <- 1
+run_SIvRD(rj)
+
+```
+
+
+```{r}
+plots = list()
+for (i in 1:nrow(rj)) {
+  #plots[[i]] <- plot_sim(r2, r2_drawn[i,])
+  fit <- as_cmdstan_fit(files = list.files(path=here::here("output",rj[i,]$dir_name), 
+                                         pattern = "*.csv$", full.names = TRUE))
+  plots[[i]] <- plot_pred_check(rj[i,], fit, 40)
+} 
+```
+```{r fig.height=8}
+grid.arrange(grobs=plots, ncol=2)
+```
+
+
+
+## Fits for data truncated at 140 days, jittered data sets.
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+r6 <- copy(rj)
+r6$truncate_data = 140
+r6$description = paste(r6$description,"140 trunc Iv")
+
+run_SIvRD(r6)
+```
+```{r fig.height=8}
+plots = list()
+for (i in 1:nrow(r6)) {
+  #plots[[i]] <- plot_sim(r2, r2_drawn[i,])
+  fit <- as_cmdstan_fit(files = list.files(path=here::here("output",r6[i,]$dir_name), 
+                                    pattern = "*.csv$", full.names = TRUE))
+  plots[[i]] <- plot_pred_check(r6[i,], fit, 40)
+} 
+grid.arrange(grobs=plots, ncol=2)
+```
+
+ 
+```{r}
+
+
+r <- copy_run(r3,"post_pc_real_data_tweets_trunc")
+r$use_tweets <- 1
+r$scale <- 1
+r$compute_likelihood <- 1
+r$truncate_data = 140
+r$description = paste(r$description,"140 trunc")
+run_baseline_SIRD(r)
+
+```
+```{r}
+fit <- as_cmdstan_fit(files = list.files(path=here::here("output",r$dir_name), 
+                                         pattern = "*.csv$", full.names = TRUE))
+
+plot_pred_check(r, fit, 40) +
+  ggtitle("Posterior Predictive Check for Deaths Real Data + tweets", subtitle = "stan/baseline.stan, scaled")
+plot
+```
