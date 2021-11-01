@@ -104,7 +104,8 @@ plot_pred_check <- function(df, fit, n_draws) {
                     'blue', fit)
   plot <- graph_observed_data(data_df = df, plot = plot)
   plot <- plot + xlim(0, 330) +
-  theme(legend.position = "none")
+  theme(legend.position = "none") +
+  ggtitle(df$description)
 }
 ```
 
@@ -151,31 +152,50 @@ plot5
 r2_drawn <- sim_jitter_from_sim(r2_sim, 3)
 r3 <- model_stan_linear_reg(r2_drawn) #in R/modeling_configs.R
 r3$use_tweets = 1
+r3$description = paste(r3$description,"tweets")
 r4 <- model_stan_linear_reg(r2_drawn)
 r4$use_tweets = 0
+r4$description = paste(r3$description,"no tweets")
 r5 = rbind(r3,r4)
+
+run_linear_regression(r5)
+
+
+```
+
+## Show fits for data jittered from Brazil data
+
+```{r}
+plots = list()
+for (i in 1:nrow(r5)) {
+  #plots[[i]] <- plot_sim(r2, r2_drawn[i,])
+  fit <- as_cmdstan_fit(files = list.files(path=here::here("output",r5[i,]$dir_name), 
+                                    pattern = "*.csv$", full.names = TRUE))
+  plots[[i]] <- plot_pred_check(r5[i,], fit, 40)
+} 
+```
+```{r fig.height=8}
+grid.arrange(grobs=plots, ncol=2)
 ```
 
 
 
+## Fits for data truncated at 140 days, jittered data sets.
 
-#r3_baseline <- model_stan_baseline(r2_drawn)
-#r3_baseline$use_tweets <- 0
-#r4 <- copy_run(r3_baseline,'140_trunc')
-#r4$truncate_data <- 140
-#r5 <- rbind(r3_baseline, r4)
-#run_df_brazil$ode_solver <- 'block'
-#run_df_brazil <- model_stan_UNINOVE_Brazil(brazil_df)
+```{r message=FALSE, warning=FALSE, include=FALSE}
+r6 <- copy(r5)
+r6$truncate_data = 140
+r6$description = paste(r6$description,"140 trunc")
 
-#r6 <- copy_run(r5,'tweets')
-#r6$use_tweets <- 1
-#r7 <- copy_run(r5,'no_tweets')
-#7$use_tweets <- 0
-
-
-
-run_df <- r3_baseline
-
-run_df$reports <- list(c('graph_data', 'plot_pred_death_draws'))
-
+run_linear_regression(r6)
+```
+```{r fig.height=8}
+plots = list()
+for (i in 1:nrow(r6)) {
+  #plots[[i]] <- plot_sim(r2, r2_drawn[i,])
+  fit <- as_cmdstan_fit(files = list.files(path=here::here("output",r6[i,]$dir_name), 
+                                    pattern = "*.csv$", full.names = TRUE))
+  plots[[i]] <- plot_pred_check(r6[i,], fit, 40)
+} 
+grid.arrange(grobs=plots, ncol=2)
 ```

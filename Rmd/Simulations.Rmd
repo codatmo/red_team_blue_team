@@ -80,3 +80,30 @@ for (i in 1:nrow(r2_drawn)) {
 ```{r fig.height=8}
 grid.arrange(grobs=plots, ncol=2)
 ```
+
+### Simulating varied Beta (infectiousness)
+
+Many factors can influence the infection rate (Beta), e.g., vaccination, public awareness, public policy etc. on a time varying basis. We choose to simulate epoch variation by a random walk with the jittered starting point with 20% of that value as the standard deviation for normal draws with a 7 day epoch. The random walk relates any subsequent epoch to the previous epoch's value.
+
+The implementation adds a daily Beta rate starting at the jittered Beta from above. 
+
+
+```{r fig.height=8}
+r2_drawn <- sim_jitter_from_sim(r2_sim, 7)
+
+ 
+r2_varied <- vary_beta_by_epoch(r2_drawn, sd = .2, epoch = 7)
+
+kable(t(trim_for_printing(r2_varied, 15)))
+
+library(gridExtra)
+plots = list()
+for (i in 1:nrow(r2_varied)) {
+  plots[[i]] <- plot_sim(r2, r2_varied[i,])
+} 
+grid.arrange(grobs=plots, ncol=2)
+```
+
+```{r }
+
+```

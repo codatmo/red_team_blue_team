@@ -52,9 +52,11 @@ model {
       if (use_tweets != 1) {
 	         normalized_tweets = 0;
       }
-      normalized_deaths ~ normal(alpha_n_patient0 + beta_death_rate * i +
-				                         tweet_rate * normalized_tweets, 
-				                         sigma_deaths_sd);
+      real deaths_for_day = alpha_n_patient0 / deaths_scaling + 
+                       beta_death_rate * i +
+				               tweet_rate * tweets[i] / tweets_scaling;
+			real deaths_scaled = deaths[i] * deaths_scaling;
+       ~ normal(deaths_for_day, sigma_deaths_sd) ;
     }
   }
 }
@@ -66,9 +68,9 @@ generated quantities {
     if (use_tweets != 1) {
       normalized_tweets = 0;
     }
-    real pred_deaths_normalized = alpha_n_patient0 +
-                                  beta_death_rate * i +
-                                  tweet_rate * normalized_tweets;
-    pred_deaths[i] = pred_deaths_normalized * deaths_scaling;
+    pred_deaths[i] = normal_rng(alpha_n_patient0 +
+                                beta_death_rate * i +
+                                tweet_rate * normalized_tweets,
+                                sigma_deaths_sd) * deaths_scaling;
   }
 }

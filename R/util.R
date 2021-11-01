@@ -72,6 +72,8 @@ countPredictionsInQuantile <- function(fit, run_df, j, print = FALSE) {
 #' y = count.
 #' @param data_df one row of the run_df with simulation data added
 #' @param hide_s Boolean to control whether to hide the s or susceptible counts
+#' @param plot ggplot plot to add to
+#' @return ggplot with SIRD states per day added
 graph_sim_data <- function(data_df, hide_s, plot) {
     if ('t' %in% data_df) { 
       sim_df = data.frame(day = 1:data_df$n_days, 
@@ -112,6 +114,10 @@ graph_sim_data <- function(data_df, hide_s, plot) {
     
 }
 
+#' Returns ggplot with geom_line() added with observed data for tweets and deaths
+#' @param data_df dataframe with data
+#' @param plot ggplot object to add to
+#' @return ggplot with geom_line() added
 graph_observed_data <- function(data_df, plot) {
   real_deaths_data_df <- data.frame(count = unlist(data_df$d), 
                              day = 1:data_df$n_days,
@@ -163,7 +169,8 @@ graph_ODE <- function(data_df, fit, hide_s, plot) {
 #' @param prediction_label the label for the prediciton in fit object
 #' @param fit cmdstanR fit object
 #' @param show_ribbon control whether to show ribbon, default = TRUE
-plot_predictions <- function(plot, prediction_label, fit, show_ribbon = TRUE) {
+plot_predictions <- function(plot, prediction_label, fit, show_ribbon = TRUE,
+                             y_label = 'count') {
     minQuantile = .2
     maxQuantile = .8
     minQuantileLabel = '20%'
@@ -172,7 +179,7 @@ plot_predictions <- function(plot, prediction_label, fit, show_ribbon = TRUE) {
                             ~quantile(.x, probs = c(minQuantile, maxQuantile),
                                       na.rm = TRUE))  #set to FALSE when Jose fixes his model
     pred_df$day = 1:nrow(pred_df)
-    pred_df$count = pred_df$mean
+    pred_df[[y_label]] = pred_df$mean
     pred_df$label = prediction_label
     
 
@@ -190,30 +197,35 @@ plot_predictions <- function(plot, prediction_label, fit, show_ribbon = TRUE) {
     return(plot)
 }
 
-plot_draws <- function(plot, variable, n_columns, n_draws = 40, color, fit) {
+#' Plots draws for variable from fit object
+#' @param plot plot being added to, x=day X y=count
+#' @param variable name of predicted variable to plot
+#' @param n_columns number of days to select
+#' @param n_draws number of draws, default 40
+#' @param color color to plot
+#' @param fit cmdStanR fit object
+#' @param y_label string label to apply to y axis, default 'count'
+#' @return ggplot geom_line 
+plot_draws <- function(plot, variable, n_columns, n_draws = 40, color, fit, 
+                       y_label = 'count') {
 
   drawsDf <- fit$draws(variables = c(variable), format = 'draws_df')
-  sample_size = n_draws
-  sampleDrawsDf <- drawsDf[sample(nrow(drawsDf), sample_size, replace = FALSE),]
+  sampleDrawsDf <- drawsDf[sample(nrow(drawsDf), n_draws, replace = FALSE),]
   colnames(sampleDrawsDf)[1:n_columns] <- 1:n_columns
   longSampleDrawsDf <- gather(sampleDrawsDf, key=day, value=variable,
                             1:all_of(n_columns))
 
   longSampleDrawsDf$day <- as.numeric(longSampleDrawsDf$day)
-  longSampleDrawsDf$count <- as.numeric(longSampleDrawsDf$variable)
+  longSampleDrawsDf[[y_label]] <- as.numeric(longSampleDrawsDf$variable)
   return( plot +
           geom_line(data = longSampleDrawsDf, alpha = 0.2, color = color, 
           aes(group = .draw)))
 }
 
-
-
-
-
-
 #' Returns string with calulation of parameter recovery
 #' @param data_df row of run_df
 #' @param fit cmdStanR fit object
+#' @return string with fit info
 param_recovery <- function(data_df, fit) {
   recov_pars = 
     fit$summary(variables = c('gamma', 'beta', 'deathRate', 'lambda_twitter'), 
@@ -286,19 +298,32 @@ setup_run_df <- function(seed, n_pop, n_days) {
   return(template_df)
 }
 
+#' Does deep copy of run configuration and appends directory name with '_' 
+#' separator
+#' @param run_df data frame for run
+#' @param dir_append_text text to append
+#' @return deep copy with $dir_name appended as described
 copy_run <- function(run_df, dir_append_text) {
   ret_df <- copy(run_df)
   ret_df$dir_name <- paste(ret_df$dir_name, dir_append_text, sep='_')
   return(ret_df)
 }
+
+
 #' Trims top level of data frame values to specified length in characters
 #' and returns data frame with those truncated values. 
+#' @param df data frame for run
+#' @length length number of characters to trim to
+#' @return data frame with all values trimed to length 
 trim_for_printing <- function(df, length){
   return (df %>% mutate_all(~(strtrim(., length))))
 }
 
-#' Plots simulation data and original data with headings indicating the parmams
+#' Plots simulation data and original data with headings indicating the params
 #' that generated the simulation
+#' @param df_data dataframe with actual data (deaths/tweets)
+#' @param df_sim dataframe with simulation data
+#' @return ggplot object ready to plot with title
 plot_sim <- function(df_data, df_sim) {
   plot <- ggplot(data = NULL, aes(x = day, y = count))
   plot <- graph_observed_data(data_df = df_data, plot = plot)
@@ -310,4 +335,24 @@ plot_sim <- function(df_data, df_sim) {
                    ", patient 0=", df_sim$n_patient_zero)) + 
     theme(legend.position = "none")
   return(plot)
+}
+
+#' Plots predictive check for prior or posterior depending on whether 
+#' likelihood has been run against the actual data
+#' @param df dataframe for actual data
+#' @param fit cmdStanR fit object
+#' @param n_draws how many draws to display
+#' @return ggplot object ready to plot
+plot_pred_check <- function(df, fit, n_draws) {
+  plot <- ggplot(data = NULL, aes(x = day, y = count))
+  plot <- plot_draws(plot = plot, variable = 'pred_deaths', n_draws = n_draws,
+                     n_columns = df$n_days, 
+                     'blue', fit)
+  plot <- plot_draws(plot = plot, variable = 'pred_tweets', n_draws = n_draws,
+                     n_columns = df$n_days, 
+                     'red', fit)
+  plot <- graph_observed_data(data_df = df, plot = plot)
+  plot <- plot + xlim(0, 330) +
+    theme(legend.position = "none") +
+    ggtitle(df$description)
 }
