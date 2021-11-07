@@ -276,10 +276,10 @@ vary_beta_by_epoch <- function(source_df, sd, epoch) {
   for (i in 1:nrow(source_df)) {
     drawn_df <- copy(source_df[i,])
     beta <- drawn_df$beta_mean
-    betas <- c()
     epoch_beta = beta
-    for (d in 1:drawn_df$n_days) {
-      if (d %% epoch == 0) {
+    betas <- c(epoch_beta)
+    for (d in 2:drawn_df$n_days) {
+      if ((d - 1) %% epoch == 0) {
         epoch_beta = rnorm(1, mean = beta, sd = sd)
       }
       betas <- c(betas, epoch_beta)

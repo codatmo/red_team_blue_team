@@ -168,6 +168,7 @@ graph_ODE <- function(data_df, fit, hide_s, plot) {
 #' @param plot ggplot that this is adding to
 #' @param prediction_label the label for the prediciton in fit object
 #' @param fit cmdstanR fit object
+#' @param quantum how many days the variable is applied for
 #' @param show_ribbon control whether to show ribbon, default = TRUE
 plot_predictions <- function(plot, prediction_label, fit, show_ribbon = TRUE,
                              y_label = 'count') {
@@ -178,6 +179,8 @@ plot_predictions <- function(plot, prediction_label, fit, show_ribbon = TRUE,
     pred_df = fit$summary(variables = c(prediction_label), mean,
                             ~quantile(.x, probs = c(minQuantile, maxQuantile),
                                       na.rm = TRUE))  #set to FALSE when Jose fixes his model
+    
+    
     pred_df$day = 1:nrow(pred_df)
     pred_df[[y_label]] = pred_df$mean
     pred_df$label = prediction_label
@@ -261,16 +264,16 @@ setup_run_df <- function(seed, n_pop, n_days) {
   template_df$description <- NA
   template_df$seed <- seed
   template_df$dir_name <- "CoDatMo"
-
+  
   # any simulation/model run
   template_df$n_pop <- n_pop
   template_df$n_days <- n_days
 
   # any model setup
   template_df$model_to_run <- 'none'
-  template_df$compute_likelihood <- NA
-  template_df$use_tweets <- NA
+  template_df$compute_likelihood <- 1
   template_df$truncate_data <- 0
+  template_df$use_tweets <- 0
 
   #setup data columns 
   template_df$s <- list(c())
@@ -355,4 +358,50 @@ plot_pred_check <- function(df, fit, n_draws) {
   plot <- plot + xlim(0, 330) +
     theme(legend.position = "none") +
     ggtitle(df$description)
+}
+
+#' Plots simulated betas in r$daily_beta added by daily varied betas
+#' @param r run df that has simulation info in r$daily_beta
+#' @return ggplot object
+plot_varied_betas <- function(r, plot) {
+  df_sim <- data.frame(day = 1:r$n_days, 
+                       beta = unlist(r$daily_betas),
+                       sim = rep("sim", r$n_days))
+  return (plot + geom_line(data = df_sim, aes(color = sim)))
+}
+
+#' Plots the simulated daily betas and the predicted betas either as a mean with
+#' ribbon plot or a number of draws from predicted betas
+#' @param r run dataframe with simulation and predictions
+#' @param draws_or_mean defaults to 'mean' string to designate which predicted plot to use
+#' @param n_draws defaults to 0, number of draws for draws configuration
+#' @return list of ggplots, use grid.arrange(grobs=plots, ncol=2) to plot
+plot_varied_betas_and_sims <- function(r, draws_or_mean = 'mean', n_draws = 0) {
+  plots = list()
+  for (i in 1:nrow(r)) {
+    
+    fit <- as_cmdstan_fit(files =
+                            list.files(path=here::here("output",r[i,]$dir_name), 
+                                       pattern = "*.csv$", full.names = TRUE))
+    
+    plot <- ggplot(data = NULL, aes(x=day, y=beta))
+    if (draws_or_mean == 'mean') {
+      plot <- plot_predictions(plot, prediction_label = 'pred_daily_betas', 
+                               fit = fit,
+                               show_ribbon = TRUE, y_label = 'beta') 
+    }
+    else if (draws_or_mean == 'draws') {
+      plot <- plot_draws(plot = plot, variable = 'pred_daily_betas', 
+                         n_draws = n_draws, 
+                         n_columns=r[i,]$n_days, color='blue', fit=fit, 
+                         y_label = 'beta')
+    }
+    else {
+      stop(paste("Neither 'draws' or 'mean' specified in param draws_or_mean",   
+                 "got=", draws_or_mean))
+    }
+    plots[[i]] <- plot_varied_betas(r[i,], plot = plot)
+    
+  }
+  return(plots)
 }

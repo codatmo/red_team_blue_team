@@ -23,7 +23,7 @@ source(here::here("R","sim_configs.R"))
 source(here::here("R", "data_configs.R"))
 source(here::here("R","modeling_configs.R"))
 ```
-# Running linear regression on Brazil simulations
+# Running on Brazil simulations
 
 The 2020 data looks like a candidate for fitting with linear regression. First
 we collect the actual data in `r2` and apply a simulated version with `r2_sim`. 
@@ -32,24 +32,24 @@ we collect the actual data in `r2` and apply a simulated version with `r2_sim`.
 ```{r}
 r1 <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 291)
 r2 <- data_brazil_2020(r1) #actual 
-r2_sim <- sim_Brazil2020(r1)
+r2_v <- vary_beta_by_epoch(sim_Brazil2020(r1), sd=.1, epoch = 291) # one epoch
 ```
 
 The below plot shows a reasonable emulation of the real data with simulated SIRD
 output from the SIRD model `baseline.stan`. 
 
 ```{r fig.width = 6}
-plot_sim(r2, r2_sim)
+plot_sim(r2, r2_v)
 ```
-## Baseline SIRD 
+## SIvRD 
 
 How well does the SIvRD model fit the deaths? We will use simulated data. 
 
 First we have to add configuration for running a Stan model:
 
 ```{r}
-r3 <- model_stan_baseline(r2) #in R/modeling_configs.R
-kable(t(trim_for_printing(r3,60)))
+r3_v <- model_stan_SIvRD(r2_v) #in R/modeling_configs.R
+kable(t(trim_for_printing(r3_v,60)))
 ```
 
 Code for running `stan/SIvRD.stan`:
@@ -72,7 +72,6 @@ run_SIvRD <- function(run_df) {
            rDay1 = 0,
            dDay1 = 0,
            center = 0,
-           run_twitter = run_df[j,]$use_tweets,
            Npop = run_df[j,]$n_pop,
            tweets = unlist(run_df[j,]$tweets),
            deaths = unlist(run_df[j,]$d),
@@ -117,13 +116,14 @@ We start with the traditional prior predictive check on actual data.
 
 
 ```{r}
-r3$use_tweets <-  0
-r3$compute_likelihood <- 0
+
 #run_baseline_SIRD(r3)
 #fit3 <- as_cmdstan_fit(files = list.files(path=here::here("output",r3$dir_name), 
 #                                         pattern = "*.csv$", full.names = TRUE))
 r4 <- copy_run(r3,"prior_pc")
 r4$scale <- 0
+r4$use_tweets <-  0
+r4$compute_likelihood <- 0
 run_SIvRD(r4)
 fit4 <- as_cmdstan_fit(files = list.files(path=here::here("output",r4$dir_name), 
                                          pattern = "*.csv$", full.names = TRUE))
@@ -156,36 +156,102 @@ fit4
 
 The summary appears to cover the fitted parameters used to create the simulated data.
 
-### Prior predictive check on simulated data
+### Posterior predictive check on simulated data
 
 How does the check work with simulated SIRD output?
 
 
 ```{r}
 
-r3_sim <- model_stan_baseline(r2_sim)
-r3_sim$use_tweets <-  0
-r3_sim$compute_likelihood <- 0
-r3_sim$scale <- 0
-#run_baseline_SIRD(r3)
-#fit3 <- as_cmdstan_fit(files = list.files(path=here::here("output",r3$dir_name), 
-#                                         pattern = "*.csv$", full.names = TRUE))
-r4_sim <- copy_run(r3_sim,"prior_pc")
-run_SIvRD(r4_sim)
-fit4_sim <- as_cmdstan_fit(files = list.files(path=here::here("output",r4_sim$dir_name), 
-                                         pattern = "*.csv$", full.names = TRUE))
+r4_v <- copy_run(r3_v,"post_pc")
+r4_v$scaled <- 1
+r4_v$compute_likilihood <- 1
+r4_v$use_tweets <- 0
+run_SIvRD(r4_v)
 
 ```
 
+```{r fig.height=8}
 
+fit <- as_cmdstan_fit(files =
+                           list.files(path=here::here("output",r4_v$dir_name), 
+                                      pattern = "*.csv$", full.names = TRUE))
+
+plot5 = plot_pred_check(r4_v, fit, 40) +
+  ggtitle("Posterior Predictive Check for Deaths Sim Data", subtitle = "stan/SIrVD.stan, scaled")
+
+plots <- plot_varied_betas_and_sims(r4_v, draws_or_mean = 'draws', n_draws = 100)
+#plot
+plots[[length(plots) + 1]] = plot5
+grid.arrange(grobs = plots, ncol=2)
+
+```
+
+Fit is spot on for predicted deaths, betas not so much. 
+
+## Fit for actual Brazil data with 30 day epoch for beta
+
+What happens with the actual Brazil data if we have a model that can vary beta? 
 ```{r}
 
-plot4_sim = plot_pred_check(r4, fit4_sim, 400) + ylim(0,200000) +
-  ggtitle("Prior Predictive Check for Deaths Simulated Data", subtitle = "stan/baseline.stan, scaled")
-plot4_sim
+r_real <- model_stan_SIvRD(copy_run(r 2,"post_pc_Brazil2020"))
+r_real$scaled <- 1
+r_real$compute_likilihood <- 1
+r_real$use_tweets <- 0
+run_SIvRD(r_real)
 
-#grid.arrange(plot3, plot4, ncol=2)
 ```
+
+```{r fig.height=8}
+
+fit <- as_cmdstan_fit(files =
+                           list.files(path=here::here("output",r_real$dir_name), 
+                                      pattern = "*.csv$", full.names = TRUE))
+
+p = plot_pred_check(r_real, fit, 40) +
+  ggtitle("Posterior Predictive Check for Deaths Brazil 2020", subtitle = "stan/SIrVD.stan, scaled")
+plot <- ggplot(data = NULL, aes(x=day, y=beta))
+p_pred <- plot_predictions(plot, prediction_label = 'pred_daily_betas', 
+                               fit = fit,
+                               show_ribbon = TRUE, y_label = 'beta') 
+
+#plot
+plots[[length(plots) + 1]] = p
+grid.arrange(p, p_pred, ncol=2)
+
+```
+
+The fit, just predicted deaths here, is very tight. The predicted betas however are all over the place and suggest wildly varying infection rates--the variation must be due to the local fitting requirements for the epoch. Beta really needs to be pooled. 
+
+## Posterior pred check with actually varied beta
+
+```{r}
+r5_v <- model_stan_SIvRD(vary_beta_by_epoch(sim_Brazil2020(r1), 
+                                            sd=.1, epoch = 30)) # weekly epoch
+r5_v <- copy_run(r5_v,"post_pc_30v")
+r5_v$scaled <- 1
+r5_v$compute_likilihood <- 1
+r5_v$use_tweets <- 0
+run_SIvRD(r5_v)
+
+
+```
+```{r}
+plots <- plot_varied_betas_and_sims(r5_v, draws_or_mean = 'mean', n_draws = 100)
+
+fit <- as_cmdstan_fit(files =
+                      list.files(path=here::here("output",r5_v$dir_name), 
+                                      pattern = "*.csv$", full.names = TRUE))
+p = plot_pred_check(r5_v, fit, 40) +
+  ggtitle("SIrVD predicted deaths with 30 day varied betas in simulation", subtitle = "stan/SIrVD.stan, scaled, no tweets")
+plots[[length(plots) + 1]] = p
+grid.arrange(grobs = plots, ncol=2)
+
+```
+Not recovering betas particulary well but fit overall is excellent. Lets try some more examples:
+
+
+
 
 ## Posterior predictive check simulated Brazil data
 
@@ -196,7 +262,8 @@ r5_sim$use_tweets <- 0
 r5_sim$scale <- 1
 r5_sim$compute_likelihood <- 1
 run_SIvRD(r5_sim)
-fit5_sim <- as_cmdstan_fit(files = list.files(path=here::here("output",r5_sim$dir_name), 
+fit5_sim <- as_cmdstan_fit(files =
+                           list.files(path=here::here("output",r5_sim$dir_name), 
                                          pattern = "*.csv$", full.names = TRUE))
 
 plot5 = plot_pred_check(r5_sim, fit5_sim, 40) +
@@ -294,7 +361,7 @@ for (i in 1:nrow(r)) {
                      color='blue', fit=fit, y_label = 'beta') +
     geom_line(data = df_sim, aes(color = sim_or_est))
   plots[[i]] <- plot
-  
+
 }
 grid.arrange(grobs=plots, ncol=2)
 ```
@@ -310,14 +377,14 @@ for (i in 1:6) {
   r_i$scale <- 1
   #plot <- plot <- ggplot(data = NULL, aes(x=day, y=beta))
   #print(plot_varied_betas(r, plot = plot))
-  r <- rbind(runs,r_i)
+  r <- rbind(r, r_i)
 }
 
 
 ```
 
 ```{r}
-run_SIvRD(r)
+run_SIvRD(r[1,])
 ```
 
 ```{r fig.height=8}
@@ -334,34 +401,8 @@ grid.arrange(grobs=plots, ncol=2)
 ## Compare recovered betas from simulated betas
 
 ```{r fig.height=8}
-plot_varied_betas <- function(r, plot) {
-   df_sim <- data.frame(day = 1:r$n_days, 
-               beta = unlist(r$daily_betas),
-               sim = rep(paste("sim", i) ,r$n_days))
-   return (plot + geom_line(data = df_sim, aes(color = sim)))
-}
 
-plot_varied_betas_and_sims <- function(r, n_draws){
-  plots = list()
-  for (i in 1:nrow(r)) {
-    #plots[[i]] <- plot_sim(r2, r2_drawn[i,])
-    fit <- as_cmdstan_fit(files =
-                            list.files(path=here::here("output",r[i,]$dir_name), 
-                                       pattern = "*.csv$", full.names = TRUE))
-    
-    plot <- ggplot(data = NULL, aes(x=day, y=beta))
-    plot <- plot_predictions(plot, prediction_label = 'beta', fit = fit,
-                             show_ribbon = TRUE, y_label = 'beta') 
-    #plot <- plot_draws(plot = plot, variable = 'beta', n_draws = n_draws, 
-    #                   n_columns=r[i,]$n_days, color='blue', fit=fit, 
-    #                   y_label = 'beta')
-      
-    plots[[i]] <- plot_varied_betas(r[i,], plot = plot)
-    
-  }
-  return(plots)
-}
-plots <- plot_varied_betas_and_sims(r, n_draws = 20)
+plots <- plot_varied_betas_and_sims(r[1,], n_draws = 20)
 grid.arrange(grobs = plots, ncol = 2)
 ```
 

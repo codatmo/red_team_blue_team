@@ -18,6 +18,22 @@ model_stan_baseline <- function(run_df) {
   return(model_df)
 }
 
+#' Returns config needed for SIvRD Stan model as copy of supplied run_df
+#' @param run_df The data frame that is being copied and modified
+model_stan_SIvRD <- function(run_df) {
+  model_df <- copy(run_df)
+  model_df$dir_name <- paste(model_df$dir_name, 'SIrVD', sep = '_')
+  model_df$use_tweets <- 1
+  model_df$description <- paste0(model_df$description,
+                                 " SIvRD")
+  model_df$compute_likelihood <- 1
+  model_df$ode_solver <- 'block'
+  model_df$model_to_run <- 'SIvRD'
+  return(model_df)
+}
+
+
+
 #' Returns SIRD configurations for model 'twitter_sird' that use tweets and 
 #' not with negative binomial likelihood. ODE solver not specified
 #' @param run_df The dataframe that is being copied and built up.

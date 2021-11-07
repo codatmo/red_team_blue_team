@@ -50,6 +50,7 @@ functions {
       real dI_dt;
       real dR_dt;
       real dD_dt;
+      #print ("beta_index=", beta_index, "i=", i);
       if (I2DandR == 1) {
         dS_dt = -beta[i] * I * S / N;
         dI_dt =  beta[i] * I * S / N - gamma * I - deathRate * I;
@@ -99,6 +100,7 @@ data {
   int I2DandR;
   int I2D2R;
   int debug;
+  int beta_epoch;
 }
 transformed data {
   real x_r[0]; //need for ODE function
@@ -115,6 +117,7 @@ transformed data {
   real sdTweets = 1; 
   int n_days_train = n_days - days_held_out;
   int x_i[1] = { Npop }; //need for ODE function
+  int n_betas = n_days/beta_epoch + 1;
   if (compute_likelihood == 1){
     if (scale == 1) {
       sdDeaths = sd(deaths);
@@ -141,7 +144,7 @@ transformed data {
 
 parameters {
   real<lower = 0, upper = 1> gamma;
-  real<lower=0, upper = 1> beta[n_days];
+  real<lower=0, upper = 1> beta[n_betas];
   real<lower=0, upper = 1> deathRate;
   real<lower=0> iDay1_est;
   real<lower=.001> lambda_twitter;
@@ -155,9 +158,14 @@ transformed parameters{
   real y[n_days, 4];
   matrix[n_days, 4] daily_counts_ODE;
   real theta[3];
+  real daily_betas[n_days];
   theta[1] = 0; //beta now its own param
   theta[2] = gamma;
   theta[3] = deathRate;
+  for (i in 1:n_days) {
+    #print("i=", i, " n_betas=", n_betas, " i/n_betas=", i/n_betas);
+    daily_betas[i] = beta[i/beta_epoch + 1];
+  }
   if (run_rk45_ODE == 1 && run_block_ODE == 1) {
     reject("cannot run both rk45 and block ODEs");
   }
@@ -165,8 +173,8 @@ transformed parameters{
     y = integrate_ode_rk45(sird, compartmentStartValues , 0.0, ts, theta, x_r, x_i);
   }
   if (run_block_ODE == 1) {
-    y = block_sird(n_days, compartmentStartValues, beta, theta, x_r, x_i, debug, 
-                   I2DandR, I2D2R);
+    y = block_sird(n_days, compartmentStartValues, daily_betas, theta, x_r, x_i, 
+                  debug, I2DandR, I2D2R);
   }
   daily_counts_ODE = to_matrix(y);
 }
@@ -207,6 +215,7 @@ generated quantities {
   row_vector[n_days] I = transposed_ode_states[iCompartment];
   row_vector[n_days] R = transposed_ode_states[rCompartment];
   row_vector[n_days] D = transposed_ode_states[dCompartment];
+  real pred_daily_betas[n_days] = daily_betas;
   for (i in 1:n_days) {
       if (use_tweets == 1) {
         pred_tweets[i] = normal_rng(lambda_twitter * 
