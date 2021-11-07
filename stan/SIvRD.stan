@@ -26,7 +26,7 @@ functions {
       return {dS_dt, dI_dt, dR_dt, dD_dt};
   }
 
-  real[,] block_sird(int days, real[] y, real[] theta, 
+  real[,] block_sird(int days, real[] y, real[] beta, real[] theta, 
              real[] x_r, int[] x_i , int debug, int I2DandR, int I2D2R) {
     real day_counts[days,4];
     real S = y[1];
@@ -34,7 +34,7 @@ functions {
     real R = y[3];
     real D = y[4];
     real N = x_i[1];
-    real beta = theta[1];
+#    real beta = theta[1];
     real gamma = theta[2];
     real deathRate = theta[3];
     if (debug == 1) {
@@ -50,15 +50,16 @@ functions {
       real dI_dt;
       real dR_dt;
       real dD_dt;
+      #print ("beta_index=", beta_index, "i=", i);
       if (I2DandR == 1) {
-        dS_dt = -beta * I * S / N;
-        dI_dt =  beta * I * S / N - gamma * I - deathRate * I;
+        dS_dt = -beta[i] * I * S / N;
+        dI_dt =  beta[i] * I * S / N - gamma * I - deathRate * I;
         dR_dt =  gamma * I; // - deathRate * R;
         dD_dt =  deathRate * I; // R;
       }
       if (I2D2R == 1) {
-        dS_dt = -beta * I * S / N;
-        dI_dt =  beta * I * S / N - gamma * I ;
+        dS_dt = -beta[i] * I * S / N;
+        dI_dt =  beta[i] * I * S / N - gamma * I ;
         dR_dt =  gamma * I - deathRate * R;
         dD_dt =  deathRate * R; 
       }
@@ -99,6 +100,7 @@ data {
   int I2DandR;
   int I2D2R;
   int debug;
+  int beta_epoch;
 }
 transformed data {
   real x_r[0]; //need for ODE function
@@ -115,6 +117,7 @@ transformed data {
   real sdTweets = 1; 
   int n_days_train = n_days - days_held_out;
   int x_i[1] = { Npop }; //need for ODE function
+  int n_betas = n_days/beta_epoch + 1;
   if (compute_likelihood == 1){
     if (scale == 1) {
       sdDeaths = sd(deaths);
@@ -141,7 +144,7 @@ transformed data {
 
 parameters {
   real<lower = 0, upper = 1> gamma;
-  real<lower=0, upper = 1> beta;
+  real<lower=0, upper = 1> beta[n_betas];
   real<lower=0, upper = 1> deathRate;
   real<lower=0> iDay1_est;
   real<lower=.001> lambda_twitter;
@@ -155,9 +158,14 @@ transformed parameters{
   real y[n_days, 4];
   matrix[n_days, 4] daily_counts_ODE;
   real theta[3];
-  theta[1] = beta;
+  real daily_betas[n_days];
+  theta[1] = 0; //beta now its own param
   theta[2] = gamma;
   theta[3] = deathRate;
+  for (i in 1:n_days) {
+    #print("i=", i, " n_betas=", n_betas, " i/n_betas=", i/n_betas);
+    daily_betas[i] = beta[i/beta_epoch + 1];
+  }
   if (run_rk45_ODE == 1 && run_block_ODE == 1) {
     reject("cannot run both rk45 and block ODEs");
   }
@@ -165,15 +173,15 @@ transformed parameters{
     y = integrate_ode_rk45(sird, compartmentStartValues , 0.0, ts, theta, x_r, x_i);
   }
   if (run_block_ODE == 1) {
-    y = block_sird(n_days, compartmentStartValues, theta, x_r, x_i, debug, 
-                   I2DandR, I2D2R);
+    y = block_sird(n_days, compartmentStartValues, daily_betas, theta, x_r, x_i, 
+                  debug, I2DandR, I2D2R);
   }
   daily_counts_ODE = to_matrix(y);
 }
 
 model {
-  beta ~ normal(prior_beta_mean, prior_beta_std);
-  gamma ~ normal(prior_gamma_mean, prior_gamma_std);
+  beta ~ normal(prior_beta_mean, prior_beta_std);// vector
+  gamma ~ normal(prior_gamma_mean, prior_gamma_std); //scalar
   deathRate ~ normal(prior_death_prob, prior_death_prob_std);
   lambda_twitter ~ normal(0,1);
   normal_tweets_sd ~ exponential(1);
@@ -194,7 +202,7 @@ model {
 }
 
 generated quantities {
-  real R0 = beta / gamma;
+  //real R0 = beta / gamma;
   real recovery_days = 1 / gamma;
   real pred_deaths[n_days];
   real pred_tweets[n_days];
@@ -207,6 +215,7 @@ generated quantities {
   row_vector[n_days] I = transposed_ode_states[iCompartment];
   row_vector[n_days] R = transposed_ode_states[rCompartment];
   row_vector[n_days] D = transposed_ode_states[dCompartment];
+  real pred_daily_betas[n_days] = daily_betas;
   for (i in 1:n_days) {
       if (use_tweets == 1) {
         pred_tweets[i] = normal_rng(lambda_twitter * 

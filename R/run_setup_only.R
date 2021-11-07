@@ -8,10 +8,10 @@
 # Vary infection 
 
 
-library(tidyverse)
-#library(cmdstanr)
+#library(tidyverse)
+library(cmdstanr)
 library(data.table)
-library(kableExtra)
+#library(kableExtra)
 #library(shinystan)
 library(rjson)
 
@@ -22,29 +22,31 @@ source(here::here("R", "data_configs.R"))
 source(here::here("R","modeling_configs.R"))
 setup_run_df <- setup_run_df(seed = 93435, n_pop = 214110287, n_days = 291) # in R/util.R
 
-iso_basic_df <- sim_SIRD_easy(setup_run_df) # in R/sim_configs.R
-iso_brazil_df <- sim_SIRD_Brazil(setup_run_df)
+#iso_basic_df <- sim_SIRD_easy(setup_run_df) # in R/sim_configs.R
+#iso_brazil_df <- sim_SIRD_Brazil(setup_run_df)
 brazil_df <- data_brazil_1(setup_run_df)
 #draws_df <- sim_draw_params_sird(n_sims = 20, iso_basic_df)
-iso_draws_df <- rbind(iso_basic_df,iso_brazil_df)
+#iso_draws_df <- rbind(iso_basic_df,iso_brazil_df)
 
-run_df_brazil <- model_stan_baseline(brazil_df) #in R/modeling_configs.R
+run_df_brazil <- model_stan_linear_reg(brazil_df) #in R/modeling_configs.R
 #run_df_brazil <- copy_run(run_df_brazil, '140heldOut')
-run_df_brazil$ode_solver <- 'rk45'
-run_df_brazil <- copy_run(run_df_brazil, 'rk45')
+#run_df_brazil$ode_solver <- 'rk45'
+#run_df_brazil <- copy_run(run_df_brazil, 'rk45_negbin')
 #run_df_brazil <- model_stan_UNINOVE_Brazil(brazil_df)
 
 run_df_brazil_no_tweets <- copy_run(run_df_brazil, 'noTweets')
-run_df_brazil_no_tweets$use_tweets <- 0
-run_df_brazil_use_tweets <- copy_run(run_df_brazil, 'tweets')
-run_df_brazil_use_tweets$use_tweets <- 1
+#run_df_brazil_no_tweets$use_tweets <- 0
+#run_df_brazil_use_tweets <- copy_run(run_df_brazil, 'tweets')
+#run_df_brazil_use_tweets$use_tweets <- 1
 
-run_df <- rbind(run_df_brazil_no_tweets, run_df_brazil_use_tweets)
+run_df <- run_df_brazil_no_tweets
+  #rbind(run_df_brazil_no_tweets, run_df_brazil_use_tweets)
 
 run_df$reports <- list(c(''))
+run_df$use_tweets <- 0
 
 run_df$compute_likelihood <- 1
-run_df <- copy_run(run_df,'non_centered')
+
 run_stan = TRUE
 
 j <- 0
@@ -60,7 +62,7 @@ while (j < nrow(run_df)) {
   }
   dir.create(here::here("output",run_df[j,]$dir_name))
   #read json
-  if (run_df[j,]$model_to_run == 'baseline') {
+  if (run_df[j,]$model_to_run == 'linear_reg') {
     stan_data <-
       list(n_days = run_df[j,]$n_days,
            sDay1 = run_df[j,]$n_pop - 1,
@@ -92,7 +94,7 @@ while (j < nrow(run_df)) {
                                          "config.json"))
     data = here::here("output",run_df[j,]$dir_name, "data.json")
     output = here::here("output",run_df[j,]$dir_name)
-    stan_exe = here::here("stan/baseline")
+    stan_exe = here::here("stan/linear_reg")
     write(toJSON(stan_data), data)
     if (run_stan) {
         for (i in 1:4) {
